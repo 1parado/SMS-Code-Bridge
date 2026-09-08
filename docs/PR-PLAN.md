@@ -236,7 +236,9 @@ Release 只上传两个文件：Windows 端可执行文件、Android 端 APK，�
 |---|---|---|
 | v0.1.0 | 配对 → 验证码 → 电脑剪贴板的核心闭环 | exe 233KB / apk 35KB |
 | v0.2.1 | 历史记录、设置开关、断连重连与解绑 | exe 264KB / apk 39KB |
-| v0.3.0 | 局域网自动发现、版本号一致性与关于信息 | 见 Release |
+| v0.3.0 | 局域网自动发现、版本号一致性与关于信息 | exe 267KB / apk 42KB |
+| v0.4.0 | Windows 托盘常驻、Android 正式签名支持 | exe 325KB / apk 42KB |
+| v0.4.1 | 修复托盘图标 1813（资源名 "tray-default"），图标改用 icon.png 多尺寸 ICO | exe 363KB / apk 42KB |
 
 ## 实际 PR 编号映射
 
@@ -254,9 +256,10 @@ Release 只上传两个文件：Windows 端可执行文件、Android 端 APK，�
 | PR-12 ~ PR-15 | 历史记录、设置开关、断连检测重连与解绑 | PR-11 ~ PR-14 |
 | PR-16 / PR-17 | 局域网发现：协议扩展、广播地址计算、手机端自动寻找电脑 | 补充缺失项 |
 | PR-18 | 版本号一致性与关于信息 | 拆分自 PR-17 |
+| PR-19 ~ PR-22 | 托盘常驻（菜单/channel、主循环装配、rc 图标资源）、签名支持、版本号统一 0.4.0 | 顺延项 v0.4 |
+| PR-23 | 托盘图标 1813 修复：资源名 "tray-default"、icon.png 多尺寸 ICO，版本 0.4.1 | 缺陷修复 |
 
-## 顺延项（v0.4）
+## 剩余事项
 
-- **Windows 托盘常驻**：需引入 GUI 依赖，体积与编译风险需评估后再做
-- **端到端真机验收**：配对、延迟、静默、解绑、不影响正常短信（清单见 `docs/acceptance-v0.1.md`）
-- **正式签名**：Android release 目前回退调试签名，正式 keystore 需配置 `KEYSTORE_PATH` 等环境变量
+- **端到端真机验收**：配对、延迟、静默、解绑、不影响正常短信（清单见 `docs/acceptance-v0.4.md`）
+- **正式签名**：Android release 在 CI 未配置 keystore Secrets 时回退调试签名，需配置 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD`
