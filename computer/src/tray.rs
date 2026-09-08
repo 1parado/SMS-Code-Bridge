@@ -31,7 +31,8 @@ pub struct TrayHandle {
 pub fn spawn() -> TrayHandle {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        let tray_result = TrayItem::new("SMS Code Bridge", IconSource::Resource("1"));
+        // tray-item 0.10 的 Windows 实现硬编码加载名为 "tray-default" 的资源图标
+        let tray_result = TrayItem::new("SMS Code Bridge", IconSource::Resource("tray-default"));
         let mut tray = match tray_result {
             Ok(tray) => tray,
             Err(error) => {
