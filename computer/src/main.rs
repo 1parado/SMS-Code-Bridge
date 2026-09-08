@@ -135,7 +135,7 @@ fn to_hex(bytes: &[u8]) -> String {
 
 /// 十六进制转字节；长度非偶数或含非法字符时返回 None。
 fn hex_decode(text: &str) -> Option<Vec<u8>> {
-    if text.len() % 2 != 0 {
+    if !text.len().is_multiple_of(2) {
         return None;
     }
     (0..text.len())
