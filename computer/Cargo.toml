@@ -6,8 +6,11 @@ description = "SMS Code Bridge - Windows 端：接收局域网验证码并写入
 
 [dependencies]
 dirs = "5"
+hmac = "0.12"
+rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 
 [profile.release]
 opt-level = "z"

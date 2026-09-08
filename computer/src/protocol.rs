@@ -65,7 +65,9 @@ mod tests {
         let raw = include_str!("../../../shared/testdata/pair_request.json");
         let message = Message::from_json(raw).expect("解析配对请求失败");
         match &message {
-            Message::PairRequest { code, device_id, .. } => {
+            Message::PairRequest {
+                code, device_id, ..
+            } => {
                 assert_eq!(code, "123456");
                 assert_eq!(device_id, "device-0001");
             }
@@ -94,7 +96,9 @@ mod tests {
         let raw = include_str!("../../../shared/testdata/code_message.json");
         let message = Message::from_json(raw).expect("解析验证码消息失败");
         match &message {
-            Message::Code { code, ts, nonce, .. } => {
+            Message::Code {
+                code, ts, nonce, ..
+            } => {
                 assert_eq!(code, "482913");
                 assert_eq!(*ts, 1_757_337_600_000);
                 assert_eq!(nonce, "n-0001");
