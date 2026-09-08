@@ -1,3 +1,5 @@
 // 托盘图标资源：tray-item 0.10 的 Windows 实现硬编码查找名为 "tray-default"
-// 的图标资源（字符串资源名，不是数字 ID），名字必须保持一致
-"tray-default" ICON "assets/icon.ico"
+// 的图标资源（字符串资源名，不是数字 ID），名字必须保持一致。
+// 资源名必须写裸标识符，不能用引号包裹：rc.exe 会把双引号当作名字的一部分
+// 存入 .res，导致 tray-item 的 LoadIconW("tray-default") 查不到（错误 1813）。
+tray-default ICON "assets/icon.ico"

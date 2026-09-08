@@ -11,8 +11,8 @@ android {
         applicationId = "com.parado.smsbridge"
         minSdk = 24
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.4.1"
+        versionCode = 5
+        versionName = "0.4.2"
     }
 
     signingConfigs {
