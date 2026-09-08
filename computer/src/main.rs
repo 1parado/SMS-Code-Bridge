@@ -1,5 +1,6 @@
 use sms_code_bridge::clipboard::{CodeSink, ConsoleNotifier, SystemClipboard};
 use sms_code_bridge::config::Config;
+use sms_code_bridge::history::HistoryStore;
 use sms_code_bridge::pairing::{now_ms, PairingManager, DEFAULT_TTL_MS};
 use sms_code_bridge::protocol::{Message, PROTOCOL_VERSION};
 use sms_code_bridge::receiver::Receiver;
@@ -27,6 +28,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         config.auto_copy,
         config.notify,
     );
+    let history_path = HistoryStore::history_path();
+    let mut history = HistoryStore::load_from(history_path.as_deref(), config.history_limit);
     let mut buffer = [0u8; MAX_FRAME_BYTES];
 
     println!("SMS Code Bridge 已启动");
@@ -67,6 +70,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(receiver) = session.as_mut() {
                     if let Ok(code) = receiver.handle(&buffer[..size], now_ms()) {
                         sink.handle(&code);
+                        history.append(&code, now_ms());
+                        if let Some(path) = history_path.as_ref() {
+                            let _ = history.save_to(path);
+                        }
                     }
                 }
             }

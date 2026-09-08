@@ -4,6 +4,7 @@
 
 pub mod clipboard;
 pub mod config;
+pub mod history;
 pub mod devices;
 pub mod pairing;
 pub mod protocol;
