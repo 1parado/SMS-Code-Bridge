@@ -1,0 +1,8 @@
+# gradlew 必须以 LF 提交，否则 Linux CI 上会出现 /bin/sh^M: bad interpreter
+gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary
+*.jks binary
+*.keystore binary
