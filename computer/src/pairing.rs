@@ -169,6 +169,17 @@ mod tests {
         assert!(manager.verify("123456", 0).is_none());
     }
 
+    /// 跨端固定向量：Android 端 PairingClientTest 使用同一组输入与期望值。
+    /// 两端算法一旦出现偏差，这里会立刻变红。
+    #[test]
+    fn derive_secret_fixed_vector_matches_android_end() {
+        let secret = derive_secret("123456", b"salt-0001");
+        assert_eq!(
+            to_hex(&secret),
+            "070f816d239ee4cd85583a75e7bd45a8749dea7c72b9777b3a905a1eb520983c"
+        );
+    }
+
     #[test]
     fn key_derivation_is_deterministic_and_sufficient_length() {
         let a = derive_secret("123456", b"salt-0001");
