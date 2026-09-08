@@ -6,3 +6,4 @@ pub mod config;
 pub mod devices;
 pub mod pairing;
 pub mod protocol;
+pub mod receiver;
