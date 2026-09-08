@@ -16,6 +16,8 @@ pub enum Message {
         v: u32,
         device_id: String,
         code: String,
+        /// 手机生成的随机盐（hex）。两端各自用 code + salt 派生同一会话密钥，密钥本身不上网传输。
+        salt_hex: String,
     },
     /// 电脑 → 手机：配对结果
     PairResponse {
@@ -83,10 +85,11 @@ mod tests {
         let message = Message::from_json(raw).expect("解析配对请求失败");
         match &message {
             Message::PairRequest {
-                code, device_id, ..
+                code, device_id, salt_hex, ..
             } => {
                 assert_eq!(code, "123456");
                 assert_eq!(device_id, "device-0001");
+                assert_eq!(salt_hex, "30313233343536373839616263646566");
             }
             other => panic!("消息类型不符: {other:?}"),
         }

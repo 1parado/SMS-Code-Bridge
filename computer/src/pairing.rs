@@ -12,8 +12,8 @@ type HmacSha256 = Hmac<Sha256>;
 /// 配对码默认有效期：2 分钟。
 pub const DEFAULT_TTL_MS: i64 = 120_000;
 
-/// 盐值长度。
-const SALT_LEN: usize = 16;
+/// 配对盐值长度：手机生成、随 PairRequest 发来，电脑只校验长度不自行生成。
+pub const SALT_LEN: usize = 16;
 
 /// 当前毫秒时间戳（时钟异常时退化为 0）。
 pub fn now_ms() -> i64 {
@@ -54,7 +54,6 @@ pub fn to_hex(bytes: &[u8]) -> String {
 #[derive(Debug, Clone)]
 pub struct Challenge {
     pub code: String,
-    pub salt: Vec<u8>,
     pub created_at_ms: i64,
     consumed: bool,
 }
@@ -80,23 +79,19 @@ impl PairingManager {
         }
     }
 
-    /// 发放一个新的配对挑战，返回 (配对码, 盐值)。再次调用会作废旧挑战。
-    pub fn issue(&mut self, now_ms: i64) -> (String, Vec<u8>) {
+    /// 发放一个新的配对挑战，返回配对码。盐值由手机端生成并随请求带来，电脑不再自行生成。
+    pub fn issue(&mut self, now_ms: i64) -> String {
         let code = generate_code();
-        let mut rng = rand::thread_rng();
-        let salt: Vec<u8> = (0..SALT_LEN).map(|_| rng.gen()).collect();
-
         self.challenge = Some(Challenge {
             code: code.clone(),
-            salt: salt.clone(),
             created_at_ms: now_ms,
             consumed: false,
         });
-        (code, salt)
+        code
     }
 
-    /// 校验配对码：错误、过期、已使用过一律拒绝。成功则消费该挑战并返回会话。
-    pub fn verify(&mut self, code: &str, now_ms: i64) -> Option<Session> {
+    /// 校验配对码与盐值：错误、过期、已使用过一律拒绝。成功则消费该挑战并返回会话。
+    pub fn verify(&mut self, code: &str, salt: &[u8], now_ms: i64) -> Option<Session> {
         let challenge = self.challenge.as_mut()?;
         if challenge.consumed {
             return None;
@@ -107,9 +102,12 @@ impl PairingManager {
         if challenge.code != code {
             return None;
         }
+        if salt.len() != SALT_LEN {
+            return None;
+        }
 
         challenge.consumed = true;
-        let secret = derive_secret(&challenge.code, &challenge.salt);
+        let secret = derive_secret(code, salt);
         Some(Session {
             session_id: to_hex(&secret[..8]),
             secret,
@@ -141,32 +139,32 @@ mod tests {
     #[test]
     fn wrong_pairing_code_rejected() {
         let mut manager = PairingManager::new(DEFAULT_TTL_MS);
-        let (code, _salt) = manager.issue(1_000);
+        let code = manager.issue(1_000);
         let wrong = if code == "000000" { "111111" } else { "000000" };
-        assert!(manager.verify(wrong, 1_100).is_none());
+        assert!(manager.verify(wrong, b"0123456789abcdef", 1_100).is_none());
         // 错误尝试不应消费掉挑战
-        assert!(manager.verify(&code, 1_100).is_some());
+        assert!(manager.verify(&code, b"0123456789abcdef", 1_100).is_some());
     }
 
     #[test]
     fn expired_pairing_code_rejected() {
         let mut manager = PairingManager::new(DEFAULT_TTL_MS);
-        let (code, _salt) = manager.issue(1_000);
-        assert!(manager.verify(&code, 1_000 + DEFAULT_TTL_MS + 1).is_none());
+        let code = manager.issue(1_000);
+        assert!(manager.verify(&code, b"0123456789abcdef", 1_000 + DEFAULT_TTL_MS + 1).is_none());
     }
 
     #[test]
     fn pairing_code_cannot_be_reused() {
         let mut manager = PairingManager::new(DEFAULT_TTL_MS);
-        let (code, _salt) = manager.issue(1_000);
-        assert!(manager.verify(&code, 1_100).is_some());
-        assert!(manager.verify(&code, 1_200).is_none(), "配对码必须一次性");
+        let code = manager.issue(1_000);
+        assert!(manager.verify(&code, b"0123456789abcdef", 1_100).is_some());
+        assert!(manager.verify(&code, b"0123456789abcdef", 1_200).is_none(), "配对码必须一次性");
     }
 
     #[test]
     fn verify_without_challenge_returns_none() {
         let mut manager = PairingManager::new(DEFAULT_TTL_MS);
-        assert!(manager.verify("123456", 0).is_none());
+        assert!(manager.verify("123456", b"0123456789abcdef", 0).is_none());
     }
 
     /// 跨端固定向量：Android 端 PairingClientTest 使用同一组输入与期望值。
@@ -193,9 +191,9 @@ mod tests {
     #[test]
     fn reset_invalidates_pending_challenge() {
         let mut manager = PairingManager::new(DEFAULT_TTL_MS);
-        let (code, _salt) = manager.issue(1_000);
+        let code = manager.issue(1_000);
         manager.reset();
-        assert!(manager.verify(&code, 1_100).is_none());
+        assert!(manager.verify(&code, b"0123456789abcdef", 1_100).is_none());
     }
 
     #[test]

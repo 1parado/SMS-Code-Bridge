@@ -32,7 +32,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     discovery_socket.set_read_timeout_millis(200)?;
 
     let mut pairing = PairingManager::new(DEFAULT_TTL_MS);
-    let (pairing_code, _salt) = pairing.issue(now_ms());
+    let pairing_code = pairing.issue(now_ms());
 
     let devices_path = DeviceStore::devices_path();
     let mut devices = DeviceStore::load(devices_path);
@@ -120,8 +120,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
         match message {
             Message::PairRequest {
-                code, device_id, ..
-            } => match pairing.verify(&code, now_ms()) {
+                code, device_id, salt_hex, ..
+            } => match pairing.verify(&code, &hex_decode(&salt_hex).unwrap_or_default(), now_ms()) {
                 Some(established) => {
                     registry.establish(device_id.clone(), established.secret);
                     heartbeat.mark(now_ms());
