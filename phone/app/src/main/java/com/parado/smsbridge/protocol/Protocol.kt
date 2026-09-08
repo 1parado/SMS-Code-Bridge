@@ -17,6 +17,8 @@ object Protocol {
     const val TYPE_CODE = "code"
     const val TYPE_HEARTBEAT = "heartbeat"
     const val TYPE_UNPAIR = "unpair"
+    const val TYPE_DISCOVERY_REQUEST = "discovery_request"
+    const val TYPE_DISCOVERY_RESPONSE = "discovery_response"
 
     sealed class Message {
         abstract val v: Int
@@ -48,6 +50,20 @@ object Protocol {
         data class Heartbeat(
             override val v: Int,
             val deviceId: String,
+        ) : Message()
+
+        /** 手机 → 电脑（广播）：谁在线？ */
+        data class DiscoveryRequest(
+            override val v: Int,
+            val deviceId: String,
+        ) : Message()
+
+        /** 电脑 → 手机：我在这里（仅含发现所需字段） */
+        data class DiscoveryResponse(
+            override val v: Int,
+            val deviceId: String,
+            val name: String,
+            val port: Int,
         ) : Message()
 
         /** 手机 → 电脑：主动解绑（清密钥 + 清配对） */
@@ -95,6 +111,20 @@ object Protocol {
                 put("device_id", message.deviceId)
             }
 
+            is Message.DiscoveryRequest -> {
+                put("type", TYPE_DISCOVERY_REQUEST)
+                put("v", message.v)
+                put("device_id", message.deviceId)
+            }
+
+            is Message.DiscoveryResponse -> {
+                put("type", TYPE_DISCOVERY_RESPONSE)
+                put("v", message.v)
+                put("device_id", message.deviceId)
+                put("name", message.name)
+                put("port", message.port)
+            }
+
             is Message.Unpair -> {
                 put("type", TYPE_UNPAIR)
                 put("v", message.v)
@@ -131,6 +161,18 @@ object Protocol {
             TYPE_HEARTBEAT -> Message.Heartbeat(
                 v,
                 json.getString("device_id"),
+            )
+
+            TYPE_DISCOVERY_REQUEST -> Message.DiscoveryRequest(
+                v,
+                json.getString("device_id"),
+            )
+
+            TYPE_DISCOVERY_RESPONSE -> Message.DiscoveryResponse(
+                v,
+                json.getString("device_id"),
+                json.optString("name"),
+                json.optInt("port", 0),
             )
 
             TYPE_UNPAIR -> Message.Unpair(
