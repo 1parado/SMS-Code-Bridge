@@ -1,0 +1,102 @@
+name: Release
+
+# 唯一出包途径：仅当一个大版本完成、打 vX.Y.Z tag 时才触发。
+# 产出两个文件：Windows 端可执行文件 + Android 端 APK，各自 ≤ 20MB。
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+env:
+  MAX_SIZE_BYTES: 20971520 # 20MB
+
+jobs:
+  windows:
+    name: 编译 Windows 端
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: computer
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: 构建 Release
+        run: cargo build --release
+
+      - name: 收集产物并做体积门禁
+        run: |
+          EXE=$(ls target/release/*.exe | head -n 1)
+          SIZE=$(wc -c < "$EXE" | tr -d ' ')
+          echo "产物: $EXE ($SIZE bytes)"
+          if [ "$SIZE" -gt "$MAX_SIZE_BYTES" ]; then
+            echo "::error::Windows 端产物超过 20MB 上限"
+            exit 1
+          fi
+          mkdir -p ../artifacts
+          cp "$EXE" "../artifacts/SMS-Code-Bridge-Windows-${{ github.ref_name }}.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: artifacts/*
+
+  android:
+    name: 编译 Android 端
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: phone
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+
+      # 未配置 KEYSTORE_* secrets 时，工程需回退到调试签名（见 PR-03）
+      - name: 构建 Release APK
+        run: chmod +x gradlew && ./gradlew assembleRelease
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: 收集产物并做体积门禁
+        run: |
+          APK=$(find . -name '*-release.apk' -not -path '*/intermediates/*' | head -n 1)
+          SIZE=$(wc -c < "$APK" | tr -d ' ')
+          echo "产物: $APK ($SIZE bytes)"
+          if [ "$SIZE" -gt "$MAX_SIZE_BYTES" ]; then
+            echo "::error::Android 端产物超过 20MB 上限"
+            exit 1
+          fi
+          mkdir -p ../artifacts
+          cp "$APK" "../artifacts/SMS-Code-Bridge-Android-${{ github.ref_name }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: artifacts/*
+
+  publish:
+    name: 发布 Release
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: artifacts/*

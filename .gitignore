@@ -1,0 +1,68 @@
+# ========== 通用 ==========
+# 本地 Agent 工作数据（非产品代码，不入库）
+.workbuddy/
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+.idea/
+.vscode/
+*.iml
+
+# ========== 敏感信息（强制忽略） ==========
+# 环境变量 / 本地配置
+.env
+.env.*
+*.env.local
+
+# 密钥、证书、签名文件（Android 签名 keystore 等）
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.key
+*.pem
+*.crt
+*.cer
+signing.properties
+keystore.properties
+local.properties
+
+# 本地凭据 / 配对密钥 / token
+*credentials*
+*secret*
+secrets.toml
+secrets.json
+*.token
+
+# 含真实手机号、短信原文、真实验证码的测试数据
+**/testdata/real/
+**/*_real.*
+sms_samples/
+
+# ========== computer/ — Windows 端（Rust） ==========
+computer/target/
+computer/**/target/
+computer/Cargo.lock.bak
+computer/*.exe
+computer/*.pdb
+computer/.config.toml
+computer/config.local.toml
+
+# ========== phone/ — Android 端（Java / Kotlin） ==========
+phone/.gradle/
+phone/build/
+phone/app/build/
+phone/*/build/
+phone/local.properties
+phone/.kotlin/
+phone/captures/
+phone/.externalNativeBuild/
+phone/.cxx/
+phone/*.apk
+phone/*.aab
+phone/*.ap_
+phone/*.dex
+phone/outputs/
+phone/release/
