@@ -1,0 +1,2 @@
+// 托盘图标资源：资源 ID 必须为 1，tray-item 以 IconSource::Resource("1") 加载
+1 ICON "assets/icon.ico"

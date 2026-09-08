@@ -7,6 +7,8 @@ use sms_code_bridge::history::HistoryStore;
 use sms_code_bridge::pairing::{now_ms, PairingManager, DEFAULT_TTL_MS};
 use sms_code_bridge::protocol::{Message, PROTOCOL_VERSION};
 use sms_code_bridge::transport::{UdpTransport, MAX_FRAME_BYTES};
+#[cfg(windows)]
+use sms_code_bridge::tray::{self, TrayAction};
 
 /// 发现响应中的设备标识；不使用真实主机名，避免暴露本机信息。
 const DEVICE_ID: &str = "pc-0001";
@@ -66,7 +68,25 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut discovery_buffer = [0u8; MAX_FRAME_BYTES];
 
+    // 托盘常驻（Windows）；菜单动作在主循环里轮询处理
+    #[cfg(windows)]
+    let tray_events = tray::spawn();
+
     loop {
+        // 托盘菜单动作
+        #[cfg(windows)]
+        if let Ok(action) = tray_events.events.try_recv() {
+            match action {
+                TrayAction::ShowPairingCode => {
+                    println!("配对码: {pairing_code}（如已过期请重启程序刷新）");
+                }
+                TrayAction::Quit => {
+                    println!("收到退出请求，正在清理…");
+                    break;
+                }
+            }
+        }
+
         // 处理局域网发现：只回应「谁在线」，不含任何敏感信息
         if let Ok((size, from)) = discovery_socket.recv(&mut discovery_buffer) {
             if let Ok(text) = std::str::from_utf8(&discovery_buffer[..size]) {
