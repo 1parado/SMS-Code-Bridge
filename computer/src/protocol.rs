@@ -33,6 +33,15 @@ pub enum Message {
     },
     /// 手机 → 电脑：心跳保活（仅含版本与设备号，绝不携带敏感信息）
     Heartbeat { v: u32, device_id: String },
+    /// 手机 → 电脑（广播）：谁在线？
+    DiscoveryRequest { v: u32, device_id: String },
+    /// 电脑 → 手机：我在这里（仅含发现所需字段）
+    DiscoveryResponse {
+        v: u32,
+        device_id: String,
+        name: String,
+        port: u16,
+    },
     /// 手机 → 电脑：主动解绑（清密钥 + 清配对）
     Unpair { v: u32, device_id: String },
 }
@@ -44,6 +53,8 @@ impl Message {
             | Message::PairResponse { v, .. }
             | Message::Code { v, .. }
             | Message::Heartbeat { v, .. }
+            | Message::DiscoveryRequest { v, .. }
+            | Message::DiscoveryResponse { v, .. }
             | Message::Unpair { v, .. } => *v,
         }
     }
@@ -108,6 +119,39 @@ mod tests {
                 assert_eq!(code, "482913");
                 assert_eq!(*ts, 1_757_337_600_000);
                 assert_eq!(nonce, "n-0001");
+            }
+            other => panic!("消息类型不符: {other:?}"),
+        }
+        let encoded = message.to_json().expect("序列化失败");
+        assert_eq!(Message::from_json(&encoded).expect("回读失败"), message);
+    }
+
+    #[test]
+    fn discovery_request_roundtrip() {
+        let raw = include_str!("../../shared/testdata/discovery_request.json");
+        let message = Message::from_json(raw).expect("解析发现请求失败");
+        match &message {
+            Message::DiscoveryRequest { device_id, .. } => assert_eq!(device_id, "device-0001"),
+            other => panic!("消息类型不符: {other:?}"),
+        }
+        let encoded = message.to_json().expect("序列化失败");
+        assert_eq!(Message::from_json(&encoded).expect("回读失败"), message);
+    }
+
+    #[test]
+    fn discovery_response_roundtrip() {
+        let raw = include_str!("../../shared/testdata/discovery_response.json");
+        let message = Message::from_json(raw).expect("解析发现响应失败");
+        match &message {
+            Message::DiscoveryResponse {
+                device_id,
+                name,
+                port,
+                ..
+            } => {
+                assert_eq!(device_id, "pc-0001");
+                assert_eq!(name, "PC-0001");
+                assert_eq!(*port, 45876);
             }
             other => panic!("消息类型不符: {other:?}"),
         }
@@ -185,7 +229,22 @@ mod tests {
             v: PROTOCOL_VERSION,
             device_id: "device-0001".into(),
         };
-        for (name, message) in [("heartbeat", heartbeat), ("unpair", unpair)] {
+        let request = Message::DiscoveryRequest {
+            v: PROTOCOL_VERSION,
+            device_id: "device-0001".into(),
+        };
+        let response = Message::DiscoveryResponse {
+            v: PROTOCOL_VERSION,
+            device_id: "pc-0001".into(),
+            name: "PC-0001".into(),
+            port: 45876,
+        };
+        for (name, message) in [
+            ("heartbeat", heartbeat),
+            ("unpair", unpair),
+            ("discovery_request", request),
+            ("discovery_response", response),
+        ] {
             let encoded = message.to_json().expect("序列化失败");
             for forbidden in [
                 "body", "sender", "phone", "address", "content", "secret", "code",

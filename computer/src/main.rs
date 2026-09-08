@@ -2,10 +2,15 @@ use sms_code_bridge::clipboard::{CodeSink, ConsoleNotifier, SystemClipboard};
 use sms_code_bridge::config::Config;
 use sms_code_bridge::connection::{Heartbeat, SessionRegistry, HEARTBEAT_TIMEOUT_MS};
 use sms_code_bridge::devices::{DeviceStore, PairedDevice};
+use sms_code_bridge::discovery::DISCOVERY_PORT;
 use sms_code_bridge::history::HistoryStore;
 use sms_code_bridge::pairing::{now_ms, PairingManager, DEFAULT_TTL_MS};
 use sms_code_bridge::protocol::{Message, PROTOCOL_VERSION};
 use sms_code_bridge::transport::{UdpTransport, MAX_FRAME_BYTES};
+
+/// 发现响应中的设备标识；不使用真实主机名，避免暴露本机信息。
+const DEVICE_ID: &str = "pc-0001";
+const DEVICE_NAME: &str = "SMS Code Bridge";
 
 fn main() {
     if let Err(error) = run() {
@@ -18,6 +23,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::load();
     let transport = UdpTransport::bind(config.port)?;
     let port = transport.local_addr()?.port();
+    // 发现端口单独监听，手机端广播「谁在线」时在这里应答
+    let discovery_socket = UdpTransport::bind(DISCOVERY_PORT)?;
+    // 两个 socket 都设短超时，主循环交替轮询，避免互相阻塞
+    transport.set_read_timeout_millis(200)?;
+    discovery_socket.set_read_timeout_millis(200)?;
 
     let mut pairing = PairingManager::new(DEFAULT_TTL_MS);
     let (pairing_code, _salt) = pairing.issue(now_ms());
@@ -51,10 +61,32 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut buffer = [0u8; MAX_FRAME_BYTES];
 
     println!("SMS Code Bridge 已启动");
-    println!("监听端口: {port}");
+    println!("监听端口: {port}（发现端口 {DISCOVERY_PORT}）");
     println!("配对码: {pairing_code}（2 分钟内有效，配对成功即失效）");
 
+    let mut discovery_buffer = [0u8; MAX_FRAME_BYTES];
+
     loop {
+        // 处理局域网发现：只回应「谁在线」，不含任何敏感信息
+        if let Ok((size, from)) = discovery_socket.recv(&mut discovery_buffer) {
+            if let Ok(text) = std::str::from_utf8(&discovery_buffer[..size]) {
+                if matches!(
+                    Message::from_json(text),
+                    Ok(Message::DiscoveryRequest { .. })
+                ) {
+                    let response = Message::DiscoveryResponse {
+                        v: PROTOCOL_VERSION,
+                        device_id: DEVICE_ID.to_string(),
+                        name: DEVICE_NAME.to_string(),
+                        port,
+                    };
+                    if let Ok(json) = response.to_json() {
+                        let _ = discovery_socket.send_to(json.as_bytes(), from);
+                    }
+                }
+            }
+        }
+
         let (size, from) = match transport.recv(&mut buffer) {
             Ok(value) => value,
             Err(_) => continue,
@@ -120,6 +152,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             Message::PairResponse { .. } => {}
+            Message::DiscoveryRequest { .. } => {
+                // 数据端口上也允许发现，方便已配对设备刷新地址
+                let response = Message::DiscoveryResponse {
+                    v: PROTOCOL_VERSION,
+                    device_id: DEVICE_ID.to_string(),
+                    name: DEVICE_NAME.to_string(),
+                    port,
+                };
+                if let Ok(json) = response.to_json() {
+                    let _ = transport.send_to(json.as_bytes(), from);
+                }
+            }
+            Message::DiscoveryResponse { .. } => {}
         }
     }
 }
