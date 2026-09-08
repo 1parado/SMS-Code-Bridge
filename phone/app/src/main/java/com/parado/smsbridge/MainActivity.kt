@@ -5,13 +5,20 @@ import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
+import com.parado.smsbridge.history.HistoryViewModel
+import com.parado.smsbridge.history.SharedPreferencesHistoryRepository
 import com.parado.smsbridge.net.UdpSender
 import com.parado.smsbridge.pairing.PairingClient
 import com.parado.smsbridge.protocol.Protocol
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * 极简主界面：输入电脑端显示的配对码，完成配对后由广播接收器自动转发验证码。
@@ -26,6 +33,8 @@ class MainActivity : Activity() {
     private lateinit var codeInput: EditText
     private lateinit var pairButton: Button
     private lateinit var unbindButton: Button
+    private lateinit var historyList: ListView
+    private lateinit var clearHistoryButton: Button
 
     private val stateMachine = PairingClient.StateMachine()
 
@@ -33,6 +42,7 @@ class MainActivity : Activity() {
     private var host: String = ""
     private var port: Int = 0
 
+    private lateinit var history: HistoryViewModel
     private var unsubscribe: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,8 +53,12 @@ class MainActivity : Activity() {
         codeInput = findViewById(R.id.codeInput)
         pairButton = findViewById(R.id.pairButton)
         unbindButton = findViewById(R.id.unbindButton)
+        historyList = findViewById(R.id.historyList)
+        clearHistoryButton = findViewById(R.id.clearHistoryButton)
         val hostInput = findViewById<EditText>(R.id.hostInput)
         val portInput = findViewById<EditText>(R.id.portInput)
+
+        history = HistoryViewModel(SharedPreferencesHistoryRepository.fromContext(this))
 
         pairButton.setOnClickListener {
             host = hostInput.text.toString().trim()
@@ -66,13 +80,24 @@ class MainActivity : Activity() {
             refresh()
         }
 
+        clearHistoryButton.setOnClickListener {
+            history.clear()
+            refreshHistory()
+            show("历史已清空")
+        }
+
         requestSmsPermission()
         refresh()
+        refreshHistory()
     }
 
     override fun onResume() {
         super.onResume()
-        unsubscribe = CodeBus.subscribe { code -> sendCode(code) }
+        unsubscribe = CodeBus.subscribe { code ->
+            history.add(code, System.currentTimeMillis())
+            sendCode(code)
+            refreshHistory()
+        }
     }
 
     override fun onPause() {
@@ -126,6 +151,14 @@ class MainActivity : Activity() {
         } else {
             View.GONE
         }
+    }
+
+    private fun refreshHistory() {
+        val timeFmt = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
+        val items = history.current().entries().map { e ->
+            "${timeFmt.format(Date(e.ts))}   ${e.code}"
+        }
+        historyList.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, items)
     }
 
     private fun show(text: String) {

@@ -59,4 +59,18 @@
         android:text="断开配对"
         android:visibility="gone" />
 
+    <ListView
+        android:id="@+id/historyList"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
+        android:layout_weight="1" />
+
+    <Button
+        android:id="@+id/clearHistoryButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="清空历史" />
+
 </LinearLayout>
