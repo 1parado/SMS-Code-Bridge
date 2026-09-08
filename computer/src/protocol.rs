@@ -32,15 +32,9 @@ pub enum Message {
         mac: String,
     },
     /// 手机 → 电脑：心跳保活（仅含版本与设备号，绝不携带敏感信息）
-    Heartbeat {
-        v: u32,
-        device_id: String,
-    },
+    Heartbeat { v: u32, device_id: String },
     /// 手机 → 电脑：主动解绑（清密钥 + 清配对）
-    Unpair {
-        v: u32,
-        device_id: String,
-    },
+    Unpair { v: u32, device_id: String },
 }
 
 impl Message {
@@ -193,7 +187,9 @@ mod tests {
         };
         for (name, message) in [("heartbeat", heartbeat), ("unpair", unpair)] {
             let encoded = message.to_json().expect("序列化失败");
-            for forbidden in ["body", "sender", "phone", "address", "content", "secret", "code"] {
+            for forbidden in [
+                "body", "sender", "phone", "address", "content", "secret", "code",
+            ] {
                 assert!(
                     !encoded.contains(forbidden),
                     "{name} 不应出现字段 {forbidden}: {encoded}"

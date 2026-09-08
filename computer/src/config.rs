@@ -166,9 +166,11 @@ mod tests {
     fn toggle_persists() {
         let dir = temp_dir("toggle");
         let path = dir.join("config.json");
-        let mut config = Config::default();
-        config.auto_copy = false;
-        config.notify = false;
+        let config = Config {
+            auto_copy: false,
+            notify: false,
+            ..Config::default()
+        };
         config.save_to(&path).expect("保存失败");
 
         let reloaded = Config::load_from(Some(&path));

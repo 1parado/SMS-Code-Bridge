@@ -94,8 +94,8 @@ impl HistoryStore {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let content =
-            serde_json::to_string(&self.entries).map_err(|err| io::Error::other(err.to_string()))?;
+        let content = serde_json::to_string(&self.entries)
+            .map_err(|err| io::Error::other(err.to_string()))?;
         fs::write(path, content)
     }
 }
