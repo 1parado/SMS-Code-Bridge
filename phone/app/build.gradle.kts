@@ -61,4 +61,6 @@ android {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    // 仅测试用：Android 运行时使用系统内置的 org.json，不打包进 APK
+    testImplementation("org.json:json:20240303")
 }
