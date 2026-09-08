@@ -86,6 +86,8 @@ class MainActivity : Activity() {
         hostInput = findViewById(R.id.hostInput)
         portInput = findViewById(R.id.portInput)
         discoverButton = findViewById(R.id.discoverButton)
+        findViewById<TextView>(R.id.aboutText).text =
+            "SMS Code Bridge v${BuildConfig.VERSION_NAME} · 数据仅在本机与局域网"
 
         discoverButton.setOnClickListener {
             statusText.text = "正在寻找电脑…"
