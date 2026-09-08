@@ -17,6 +17,8 @@ import android.widget.Toast
 import com.parado.smsbridge.connection.ConnectionMonitor
 import com.parado.smsbridge.history.HistoryViewModel
 import com.parado.smsbridge.history.SharedPreferencesHistoryRepository
+import com.parado.smsbridge.net.Discovery
+import com.parado.smsbridge.net.DiscoveryClient
 import com.parado.smsbridge.net.UdpSender
 import com.parado.smsbridge.pairing.PairingClient
 import com.parado.smsbridge.protocol.Protocol
@@ -43,6 +45,9 @@ class MainActivity : Activity() {
     private lateinit var clearHistoryButton: Button
     private lateinit var autoForwardCheckbox: CheckBox
     private lateinit var notifyCheckbox: CheckBox
+    private lateinit var discoverButton: Button
+    private lateinit var hostInput: EditText
+    private lateinit var portInput: EditText
 
     private val stateMachine = PairingClient.StateMachine()
 
@@ -78,8 +83,14 @@ class MainActivity : Activity() {
         clearHistoryButton = findViewById(R.id.clearHistoryButton)
         autoForwardCheckbox = findViewById(R.id.autoForwardCheckbox)
         notifyCheckbox = findViewById(R.id.notifyCheckbox)
-        val hostInput = findViewById<EditText>(R.id.hostInput)
-        val portInput = findViewById<EditText>(R.id.portInput)
+        hostInput = findViewById(R.id.hostInput)
+        portInput = findViewById(R.id.portInput)
+        discoverButton = findViewById(R.id.discoverButton)
+
+        discoverButton.setOnClickListener {
+            statusText.text = "正在寻找电脑…"
+            Thread { discoverPc() }.start()
+        }
 
         history = HistoryViewModel(SharedPreferencesHistoryRepository.fromContext(this))
         settings = SettingViewModel(SharedPreferencesSettingRepository.fromContext(this))
@@ -144,6 +155,47 @@ class MainActivity : Activity() {
         unsubscribe = null
         stopHeartbeat()
         super.onPause()
+    }
+
+    /** 在后台线程广播「谁在线」，回到主线程回填地址与端口。 */
+    private fun discoverPc() {
+        val broadcast = guessBroadcastAddress()
+        val devices = if (broadcast == null) {
+            emptyList()
+        } else {
+            DiscoveryClient.discover(broadcast, deviceId = deviceId)
+        }
+        runOnUiThread {
+            if (devices.isEmpty()) {
+                show("未找到电脑端：请确认在同一局域网且电脑端已启动")
+            } else {
+                val device = devices.first()
+                host = device.host
+                port = device.port
+                hostInput.setText(device.host)
+                portInput.setText(device.port.toString())
+                show("已找到 ${device.name}：${device.host}:${device.port}")
+            }
+        }
+    }
+
+    /** 猜测广播地址：取本机局域网地址 + 常见 24 位掩码。 */
+    private fun guessBroadcastAddress(): String? {
+        val addresses = mutableListOf<String>()
+        runCatching {
+            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val nif = interfaces.nextElement()
+                if (!nif.isUp || nif.isLoopback) continue
+                for (addr in nif.inetAddresses) {
+                    if (addr is java.net.Inet4Address) {
+                        addr.hostAddress?.let { addresses.add(it) }
+                    }
+                }
+            }
+        }
+        val local = Discovery.pickLanAddress(addresses) ?: return null
+        return Discovery.broadcastAddress(local, "255.255.255.0")
     }
 
     private fun sendPairRequest(code: String) {
