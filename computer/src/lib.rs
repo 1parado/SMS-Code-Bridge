@@ -15,6 +15,8 @@ pub mod pairing;
 pub mod protocol;
 pub mod receiver;
 pub mod transport;
+#[cfg(windows)]
+pub mod tray;
 
 #[cfg(test)]
 mod tests {

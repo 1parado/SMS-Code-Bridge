@@ -4,6 +4,9 @@ version = "0.2.0"
 edition = "2021"
 description = "SMS Code Bridge - Windows 端：接收局域网验证码并写入剪贴板"
 
+[build-dependencies]
+embed-resource = "2"
+
 [dependencies]
 clipboard-win = "5"
 dirs = "5"
@@ -12,6 +15,7 @@ rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
+tray-item = "0.10"
 
 [profile.release]
 opt-level = "z"
