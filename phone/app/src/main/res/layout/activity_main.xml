@@ -17,6 +17,13 @@
         android:textColor="#333333"
         android:textSize="18sp" />
 
+    <Button
+        android:id="@+id/discoverButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:text="自动寻找电脑" />
+
     <EditText
         android:id="@+id/hostInput"
         android:layout_width="match_parent"
