@@ -4,10 +4,10 @@
 
 pub mod clipboard;
 pub mod config;
-pub mod history;
+pub mod connection;
 pub mod devices;
+pub mod history;
 pub mod pairing;
 pub mod protocol;
 pub mod receiver;
 pub mod transport;
-pub mod connection;
