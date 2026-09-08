@@ -62,10 +62,12 @@ mod tests {
 
     #[test]
     fn pair_request_roundtrip() {
-        let raw = include_str!("../../../shared/testdata/pair_request.json");
+        let raw = include_str!("../../shared/testdata/pair_request.json");
         let message = Message::from_json(raw).expect("解析配对请求失败");
         match &message {
-            Message::PairRequest { code, device_id, .. } => {
+            Message::PairRequest {
+                code, device_id, ..
+            } => {
                 assert_eq!(code, "123456");
                 assert_eq!(device_id, "device-0001");
             }
@@ -78,7 +80,7 @@ mod tests {
 
     #[test]
     fn pair_response_roundtrip() {
-        let raw = include_str!("../../../shared/testdata/pair_response.json");
+        let raw = include_str!("../../shared/testdata/pair_response.json");
         let message = Message::from_json(raw).expect("解析配对响应失败");
         match &message {
             Message::PairResponse { ok, session_id, .. } => {
@@ -91,10 +93,12 @@ mod tests {
 
     #[test]
     fn code_message_roundtrip() {
-        let raw = include_str!("../../../shared/testdata/code_message.json");
+        let raw = include_str!("../../shared/testdata/code_message.json");
         let message = Message::from_json(raw).expect("解析验证码消息失败");
         match &message {
-            Message::Code { code, ts, nonce, .. } => {
+            Message::Code {
+                code, ts, nonce, ..
+            } => {
                 assert_eq!(code, "482913");
                 assert_eq!(*ts, 1_757_337_600_000);
                 assert_eq!(nonce, "n-0001");
@@ -107,24 +111,23 @@ mod tests {
 
     #[test]
     fn unknown_field_is_ignored() {
-        let raw = include_str!("../../../shared/testdata/code_message_unknown_field.json");
+        let raw = include_str!("../../shared/testdata/code_message_unknown_field.json");
         let message = Message::from_json(raw).expect("未知字段应当被忽略");
-        let expected =
-            Message::from_json(include_str!("../../../shared/testdata/code_message.json"))
-                .expect("解析基准夹具失败");
+        let expected = Message::from_json(include_str!("../../shared/testdata/code_message.json"))
+            .expect("解析基准夹具失败");
         assert_eq!(message, expected);
     }
 
     #[test]
     fn version_mismatch_rejected() {
-        let raw = include_str!("../../../shared/testdata/code_message_version_mismatch.json");
+        let raw = include_str!("../../shared/testdata/code_message_version_mismatch.json");
         let message = Message::from_json(raw).expect("结构合法，应能解析");
         assert!(!message.is_supported());
     }
 
     #[test]
     fn code_message_never_carries_sensitive_fields() {
-        let raw = include_str!("../../../shared/testdata/code_message.json");
+        let raw = include_str!("../../shared/testdata/code_message.json");
         let message = Message::from_json(raw).expect("解析失败");
         let encoded = message.to_json().expect("序列化失败");
         for forbidden in ["body", "sender", "phone", "address", "content"] {
