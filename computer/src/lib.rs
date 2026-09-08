@@ -35,4 +35,11 @@ mod tests {
             .expect("Cargo.toml 中应声明 version");
         assert_eq!(APP_VERSION, declared);
     }
+
+    /// 跨端版本号硬锁定：与 shared/version.txt 保持一致，Android 端同样断言。
+    #[test]
+    fn app_version_matches_shared_version_file() {
+        let shared = include_str!("../../shared/version.txt").trim();
+        assert_eq!(APP_VERSION, shared);
+    }
 }
