@@ -17,6 +17,15 @@
         android:textColor="#333333"
         android:textSize="18sp" />
 
+    <TextView
+        android:id="@+id/aboutText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:gravity="center"
+        android:textColor="#999999"
+        android:textSize="12sp" />
+
     <Button
         android:id="@+id/discoverButton"
         android:layout_width="match_parent"

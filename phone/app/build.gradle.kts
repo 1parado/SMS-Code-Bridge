@@ -52,6 +52,11 @@ android {
         jvmTarget = "17"
     }
 
+    buildFeatures {
+        // 用于「关于」页与版本号一致性测试
+        buildConfig = true
+    }
+
     lint {
         // 先不把 lint 作为合并门禁，待 UI 稳定后再收紧
         abortOnError = false
