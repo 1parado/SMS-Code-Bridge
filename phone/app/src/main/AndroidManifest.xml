@@ -11,6 +11,16 @@
     <application
         android:allowBackup="false"
         android:label="SMS Code Bridge"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <receiver
+            android:name=".sms.SmsReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+    </application>
 
 </manifest>
