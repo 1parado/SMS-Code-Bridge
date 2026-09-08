@@ -57,7 +57,11 @@ mod tests {
     fn send_and_receive_over_loopback() {
         let server = UdpTransport::bind(0).expect("绑定服务端失败");
         let client = UdpTransport::bind(0).expect("绑定客户端失败");
-        let server_addr = server.local_addr().expect("获取服务端地址失败");
+        // 服务端绑定在 0.0.0.0，必须向回环地址发送（向 0.0.0.0 发送在 Windows 上无效）
+        let server_port = server.local_addr().expect("获取服务端地址失败").port();
+        let server_addr: SocketAddr = format!("127.0.0.1:{server_port}")
+            .parse()
+            .expect("解析回环地址失败");
         server.set_read_timeout_millis(2_000).expect("设置超时失败");
 
         let payload = b"hello-bridge";
