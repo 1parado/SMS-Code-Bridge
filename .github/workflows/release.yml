@@ -59,11 +59,26 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
 
-      # 未配置 KEYSTORE_* secrets 时，工程需回退到调试签名（见 PR-03）
+      # 正式签名（可选）：配置 KEYSTORE_BASE64 等 Secrets 后自动启用；
+      # 未配置时 build.gradle.kts 回退到调试签名
+      - name: 检测签名配置
+        id: sign
+        run: echo "configured=${{ secrets.KEYSTORE_BASE64 != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: 解码正式签名 keystore
+        if: steps.sign.outputs.configured == 'true'
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
+          echo "KEYSTORE_PATH=/tmp/release.keystore" >> "$GITHUB_ENV"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
       - name: 构建 Release APK
         run: chmod +x gradlew && ./gradlew assembleRelease
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
