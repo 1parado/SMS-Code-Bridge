@@ -187,6 +187,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             Message::DiscoveryResponse { .. } => {}
         }
     }
+
+    // 托盘「退出」走 break 到这里，正常结束
+    Ok(())
 }
 
 /// 字节切片转小写十六进制（用于持久化密钥）。
