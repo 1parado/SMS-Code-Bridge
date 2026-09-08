@@ -31,6 +31,16 @@ pub enum Message {
         nonce: String,
         mac: String,
     },
+    /// 手机 → 电脑：心跳保活（仅含版本与设备号，绝不携带敏感信息）
+    Heartbeat {
+        v: u32,
+        device_id: String,
+    },
+    /// 手机 → 电脑：主动解绑（清密钥 + 清配对）
+    Unpair {
+        v: u32,
+        device_id: String,
+    },
 }
 
 impl Message {
@@ -38,7 +48,9 @@ impl Message {
         match self {
             Message::PairRequest { v, .. }
             | Message::PairResponse { v, .. }
-            | Message::Code { v, .. } => *v,
+            | Message::Code { v, .. }
+            | Message::Heartbeat { v, .. }
+            | Message::Unpair { v, .. } => *v,
         }
     }
 
@@ -135,6 +147,58 @@ mod tests {
                 !encoded.contains(forbidden),
                 "消息体不应出现字段 {forbidden}: {encoded}"
             );
+        }
+    }
+
+    #[test]
+    fn heartbeat_roundtrip() {
+        let raw = include_str!("../../shared/testdata/heartbeat.json");
+        let message = Message::from_json(raw).expect("解析心跳失败");
+        match &message {
+            Message::Heartbeat { v, device_id } => {
+                assert_eq!(*v, PROTOCOL_VERSION);
+                assert_eq!(device_id, "device-0001");
+            }
+            other => panic!("消息类型不符: {other:?}"),
+        }
+        assert!(message.is_supported());
+        let encoded = message.to_json().expect("序列化失败");
+        assert_eq!(Message::from_json(&encoded).expect("回读失败"), message);
+    }
+
+    #[test]
+    fn unpair_roundtrip() {
+        let raw = include_str!("../../shared/testdata/unpair.json");
+        let message = Message::from_json(raw).expect("解析解绑消息失败");
+        match &message {
+            Message::Unpair { v, device_id } => {
+                assert_eq!(*v, PROTOCOL_VERSION);
+                assert_eq!(device_id, "device-0001");
+            }
+            other => panic!("消息类型不符: {other:?}"),
+        }
+        let encoded = message.to_json().expect("序列化失败");
+        assert_eq!(Message::from_json(&encoded).expect("回读失败"), message);
+    }
+
+    #[test]
+    fn heartbeat_and_unpair_never_carry_sensitive_fields() {
+        let heartbeat = Message::Heartbeat {
+            v: PROTOCOL_VERSION,
+            device_id: "device-0001".into(),
+        };
+        let unpair = Message::Unpair {
+            v: PROTOCOL_VERSION,
+            device_id: "device-0001".into(),
+        };
+        for (name, message) in [("heartbeat", heartbeat), ("unpair", unpair)] {
+            let encoded = message.to_json().expect("序列化失败");
+            for forbidden in ["body", "sender", "phone", "address", "content", "secret", "code"] {
+                assert!(
+                    !encoded.contains(forbidden),
+                    "{name} 不应出现字段 {forbidden}: {encoded}"
+                );
+            }
         }
     }
 }

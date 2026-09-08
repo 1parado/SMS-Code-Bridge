@@ -80,6 +80,11 @@ impl DeviceStore {
     pub fn path(&self) -> &Path {
         &self.path
     }
+
+    /// 默认设备文件路径：`<用户配置目录>/sms-code-bridge/devices.json`
+    pub fn devices_path() -> Option<PathBuf> {
+        dirs::config_dir().map(|dir| dir.join("sms-code-bridge").join("devices.json"))
+    }
 }
 
 #[cfg(test)]

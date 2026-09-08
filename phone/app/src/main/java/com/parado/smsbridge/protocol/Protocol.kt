@@ -15,6 +15,8 @@ object Protocol {
     const val TYPE_PAIR_REQUEST = "pair_request"
     const val TYPE_PAIR_RESPONSE = "pair_response"
     const val TYPE_CODE = "code"
+    const val TYPE_HEARTBEAT = "heartbeat"
+    const val TYPE_UNPAIR = "unpair"
 
     sealed class Message {
         abstract val v: Int
@@ -40,6 +42,18 @@ object Protocol {
             val ts: Long,
             val nonce: String,
             val mac: String,
+        ) : Message()
+
+        /** 手机 → 电脑：心跳保活（仅含版本与设备号） */
+        data class Heartbeat(
+            override val v: Int,
+            val deviceId: String,
+        ) : Message()
+
+        /** 手机 → 电脑：主动解绑（清密钥 + 清配对） */
+        data class Unpair(
+            override val v: Int,
+            val deviceId: String,
         ) : Message()
     }
 
@@ -74,6 +88,18 @@ object Protocol {
                 put("nonce", message.nonce)
                 put("mac", message.mac)
             }
+
+            is Message.Heartbeat -> {
+                put("type", TYPE_HEARTBEAT)
+                put("v", message.v)
+                put("device_id", message.deviceId)
+            }
+
+            is Message.Unpair -> {
+                put("type", TYPE_UNPAIR)
+                put("v", message.v)
+                put("device_id", message.deviceId)
+            }
         }
     }.toString()
 
@@ -100,6 +126,16 @@ object Protocol {
                 json.getLong("ts"),
                 json.getString("nonce"),
                 json.getString("mac"),
+            )
+
+            TYPE_HEARTBEAT -> Message.Heartbeat(
+                v,
+                json.getString("device_id"),
+            )
+
+            TYPE_UNPAIR -> Message.Unpair(
+                v,
+                json.getString("device_id"),
             )
 
             else -> null

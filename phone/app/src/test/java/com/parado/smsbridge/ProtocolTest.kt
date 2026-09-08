@@ -93,4 +93,38 @@ class ProtocolTest {
             assertFalse("消息体不应出现字段 $forbidden: $json", json.contains(forbidden))
         }
     }
+
+    @Test
+    fun heartbeatRoundtrip() {
+        val message = Protocol.parse(fixture("heartbeat.json"))
+        assertNotNull(message)
+        message as Protocol.Message.Heartbeat
+        assertEquals(Protocol.VERSION, message.v)
+        assertEquals("device-0001", message.deviceId)
+
+        val reparsed = Protocol.parse(Protocol.toJson(message))
+        assertEquals(message, reparsed)
+    }
+
+    @Test
+    fun unpairRoundtrip() {
+        val message = Protocol.parse(fixture("unpair.json"))
+        assertNotNull(message)
+        message as Protocol.Message.Unpair
+        assertEquals(Protocol.VERSION, message.v)
+        assertEquals("device-0001", message.deviceId)
+
+        val reparsed = Protocol.parse(Protocol.toJson(message))
+        assertEquals(message, reparsed)
+    }
+
+    @Test
+    fun heartbeatAndUnpairNeverCarrySensitiveFields() {
+        val heartbeat = Protocol.toJson(Protocol.Message.Heartbeat(Protocol.VERSION, "device-0001"))
+        val unpair = Protocol.toJson(Protocol.Message.Unpair(Protocol.VERSION, "device-0001"))
+        listOf("body", "sender", "phone", "address", "content", "secret", "code").forEach { forbidden ->
+            assertFalse("heartbeat 不应出现字段 $forbidden: $heartbeat", heartbeat.contains(forbidden))
+            assertFalse("unpair 不应出现字段 $forbidden: $unpair", unpair.contains(forbidden))
+        }
+    }
 }

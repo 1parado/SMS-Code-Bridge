@@ -10,3 +10,4 @@ pub mod pairing;
 pub mod protocol;
 pub mod receiver;
 pub mod transport;
+pub mod connection;

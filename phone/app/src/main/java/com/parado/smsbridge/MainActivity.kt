@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -12,6 +14,7 @@ import android.widget.EditText
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
+import com.parado.smsbridge.connection.ConnectionMonitor
 import com.parado.smsbridge.history.HistoryViewModel
 import com.parado.smsbridge.history.SharedPreferencesHistoryRepository
 import com.parado.smsbridge.net.UdpSender
@@ -50,7 +53,18 @@ class MainActivity : Activity() {
     private lateinit var history: HistoryViewModel
     private lateinit var settings: SettingViewModel
     private lateinit var handler: CodeHandler
+    private lateinit var monitor: ConnectionMonitor
     private var unsubscribe: (() -> Unit)? = null
+
+    /** 本机设备号（与电脑端配对时登记的 device_id 保持一致）。 */
+    private val deviceId = "android"
+
+    /** 心跳发送间隔与超时（毫秒）。 */
+    private val heartbeatIntervalMs = 5_000L
+    private val heartbeatTimeoutMs = 15_000L
+
+    private val heartbeatHandler = Handler(Looper.getMainLooper())
+    private val heartbeatRunnable = Runnable { sendHeartbeat() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,6 +84,7 @@ class MainActivity : Activity() {
         history = HistoryViewModel(SharedPreferencesHistoryRepository.fromContext(this))
         settings = SettingViewModel(SharedPreferencesSettingRepository.fromContext(this))
         handler = CodeHandler(history, settings)
+        monitor = ConnectionMonitor(heartbeatTimeoutMs, 1_000, 2, 30_000)
 
         autoForwardCheckbox.isChecked = settings.current().autoForward()
         notifyCheckbox.isChecked = settings.current().notify()
@@ -93,6 +108,9 @@ class MainActivity : Activity() {
 
         unbindButton.setOnClickListener {
             stateMachine.unbind()
+            stopHeartbeat()
+            sendUnpair()
+            monitor = ConnectionMonitor(heartbeatTimeoutMs, 1_000, 2, 30_000)
             refresh()
         }
 
@@ -118,29 +136,66 @@ class MainActivity : Activity() {
             )
             refreshHistory()
         }
+        if (stateMachine.state == PairingClient.State.Paired) startHeartbeat()
     }
 
     override fun onPause() {
         unsubscribe?.invoke()
         unsubscribe = null
+        stopHeartbeat()
         super.onPause()
     }
 
     private fun sendPairRequest(code: String) {
         stateMachine.start()
         val payload = Protocol.toJson(
-            Protocol.Message.PairRequest(Protocol.VERSION, "android", code),
+            Protocol.Message.PairRequest(Protocol.VERSION, deviceId, code),
         )
         val ok = UdpSender.sendText(host, port, payload)
         if (ok) {
-            statusText.text = "配对请求已发送，等待电脑端确认"
-            // v0.1：电脑端响应由后台服务处理，此处先置为配对中
+            // v0.1：电脑端响应由后台服务处理，此处先置为配对中并本地建立会话
             stateMachine.succeed(PairingClient.deriveSecretHex(code, ByteArray(0)))
+            statusText.text = "已配对（在线）"
+            startHeartbeat()
         } else {
             stateMachine.fail()
             show("发送失败，请检查地址与网络")
         }
         refresh()
+    }
+
+    /** 周期性向电脑端发送心跳；失败则进入指数退避重连。 */
+    private fun sendHeartbeat() {
+        if (stateMachine.session == null) {
+            stopHeartbeat()
+            return
+        }
+        val payload = Protocol.toJson(Protocol.Message.Heartbeat(Protocol.VERSION, deviceId))
+        val ok = UdpSender.sendText(host, port, payload)
+        val delay = if (ok) {
+            monitor.onHeartbeat(System.currentTimeMillis())
+            heartbeatIntervalMs
+        } else {
+            statusText.text = "已配对（重连中…）"
+            monitor.nextReconnectDelayMs()
+        }
+        heartbeatHandler.postDelayed(heartbeatRunnable, delay)
+    }
+
+    private fun startHeartbeat() {
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
+        heartbeatHandler.postDelayed(heartbeatRunnable, heartbeatIntervalMs)
+    }
+
+    private fun stopHeartbeat() {
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
+    }
+
+    /** 解绑时通知电脑端清除密钥与配对（尽力发送，失败不影响本地解绑）。 */
+    private fun sendUnpair() {
+        if (host.isEmpty() || port <= 0) return
+        val payload = Protocol.toJson(Protocol.Message.Unpair(Protocol.VERSION, deviceId))
+        UdpSender.sendText(host, port, payload)
     }
 
     private fun sendCode(code: String) {
