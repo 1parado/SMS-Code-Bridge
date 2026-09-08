@@ -33,4 +33,11 @@ class AboutTest {
         assertEquals("版本号应为三段式：主.次.修订", 3, parts.size)
         parts.forEach { part -> assertNotNull(part.toIntOrNull()) }
     }
+
+    /** 跨端版本号硬锁定：与 shared/version.txt 保持一致，Windows 端同样断言。 */
+    @Test
+    fun version_name_matches_shared_version_file() {
+        val shared = File("../../shared/version.txt").readText().trim()
+        assertEquals(shared, BuildConfig.VERSION_NAME)
+    }
 }
