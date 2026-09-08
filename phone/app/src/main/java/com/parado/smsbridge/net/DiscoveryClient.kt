@@ -62,7 +62,14 @@ object DiscoveryClient {
             val deadline = System.currentTimeMillis() + timeoutMs
             while (System.currentTimeMillis() < deadline) {
                 val packet = DatagramPacket(buffer, buffer.size)
-                runCatching { socket.receive(packet) }.getOrElse { break }
+                val received = try {
+                    socket.receive(packet)
+                    true
+                } catch (_: Exception) {
+                    // 超时或网络异常：结束等待，返回已收集结果
+                    false
+                }
+                if (!received) break
                 val text = String(packet.data, packet.offset, packet.length, Charsets.UTF_8)
                 val host = packet.address?.hostAddress ?: continue
                 parseResponse(text, host)?.let { device ->
