@@ -23,7 +23,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let (pairing_code, _salt) = pairing.issue(now_ms());
 
     let devices_path = DeviceStore::devices_path();
-    let mut devices = DeviceStore::load(devices_path.as_deref());
+    let mut devices = DeviceStore::load(devices_path);
     let mut registry = SessionRegistry::new();
     // 若本机已持久化配对，则恢复会话（密钥仅在本机，绝不上网）
     if let Some(stored) = devices.list().first() {

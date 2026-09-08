@@ -27,8 +27,9 @@ pub struct DeviceStore {
 }
 
 impl DeviceStore {
-    /// 从文件加载；文件不存在或损坏时得到空列表。
-    pub fn load(path: PathBuf) -> Self {
+    /// 从文件加载；路径为 None（配置目录不可用）或文件不存在/损坏时得到空列表。
+    pub fn load(path: Option<PathBuf>) -> Self {
+        let path = path.unwrap_or_default();
         let devices = match fs::read_to_string(&path) {
             Ok(content) => serde_json::from_str::<DeviceFile>(&content)
                 .map(|file| file.devices)
@@ -117,7 +118,7 @@ mod tests {
     #[test]
     fn load_missing_file_yields_empty_store() {
         let dir = temp_dir("missing");
-        let store = DeviceStore::load(dir.join("devices.json"));
+        let store = DeviceStore::load(Some(dir.join("devices.json")));
         assert!(store.list().is_empty());
         fs::remove_dir_all(&dir).ok();
     }
@@ -127,7 +128,7 @@ mod tests {
         let dir = temp_dir("corrupted");
         let path = dir.join("devices.json");
         fs::write(&path, "{ broken").expect("写入失败");
-        let store = DeviceStore::load(path);
+        let store = DeviceStore::load(Some(path));
         assert!(store.list().is_empty());
         fs::remove_dir_all(&dir).ok();
     }
@@ -135,7 +136,7 @@ mod tests {
     #[test]
     fn add_then_get() {
         let dir = temp_dir("add");
-        let mut store = DeviceStore::load(dir.join("devices.json"));
+        let mut store = DeviceStore::load(Some(dir.join("devices.json")));
         store.add(sample("device-0001", "Pixel"));
         assert_eq!(store.list().len(), 1);
         assert_eq!(
@@ -149,7 +150,7 @@ mod tests {
     #[test]
     fn add_replaces_device_with_same_id() {
         let dir = temp_dir("replace");
-        let mut store = DeviceStore::load(dir.join("devices.json"));
+        let mut store = DeviceStore::load(Some(dir.join("devices.json")));
         store.add(sample("device-0001", "Old"));
         store.add(sample("device-0001", "New"));
         assert_eq!(store.list().len(), 1);
@@ -163,7 +164,7 @@ mod tests {
     #[test]
     fn remove_device() {
         let dir = temp_dir("remove");
-        let mut store = DeviceStore::load(dir.join("devices.json"));
+        let mut store = DeviceStore::load(Some(dir.join("devices.json")));
         store.add(sample("device-0001", "Pixel"));
         assert!(store.remove("device-0001"));
         assert!(!store.remove("device-0001"), "重复删除应返回 false");
@@ -174,7 +175,7 @@ mod tests {
     #[test]
     fn clear_removes_all() {
         let dir = temp_dir("clear");
-        let mut store = DeviceStore::load(dir.join("devices.json"));
+        let mut store = DeviceStore::load(Some(dir.join("devices.json")));
         store.add(sample("d1", "A"));
         store.add(sample("d2", "B"));
         store.clear();
@@ -186,11 +187,11 @@ mod tests {
     fn persist_and_reload() {
         let dir = temp_dir("persist");
         let path = dir.join("nested").join("devices.json");
-        let mut store = DeviceStore::load(path.clone());
+        let mut store = DeviceStore::load(Some(path.clone()));
         store.add(sample("device-0001", "Pixel"));
         store.save().expect("保存失败");
 
-        let reloaded = DeviceStore::load(path);
+        let reloaded = DeviceStore::load(Some(path));
         assert_eq!(reloaded.list(), store.list());
         fs::remove_dir_all(&dir).ok();
     }

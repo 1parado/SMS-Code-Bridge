@@ -39,6 +39,20 @@ pub struct Receiver {
     recent: VecDeque<(i64, String)>,
 }
 
+impl std::fmt::Debug for Receiver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // 注意：secret 属敏感凭据，Debug 输出中一律脱敏，仅暴露非敏感的运行期计数。
+        f.debug_struct("Receiver")
+            .field("replay_window_ms", &self.replay_window_ms)
+            .field("dedup_window_ms", &self.dedup_window_ms)
+            .field("max_packet_bytes", &self.max_packet_bytes)
+            .field("seen_nonces_len", &self.seen_nonces.len())
+            .field("recent_len", &self.recent.len())
+            .field("secret", &"<redacted>")
+            .finish()
+    }
+}
+
 impl Receiver {
     pub fn new(secret: [u8; 32]) -> Self {
         Self {

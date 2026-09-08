@@ -2,11 +2,7 @@
 //!
 //! 纯逻辑，便于单元测试；不依赖任何平台能力。
 
-use crate::devices::{DeviceStore, PairedDevice};
-use crate::protocol::{Message, PROTOCOL_VERSION};
 use crate::receiver::Receiver;
-use std::fs;
-use std::path::PathBuf;
 use std::time::Duration;
 
 /// 心跳超时阈值（毫秒）：超过该时长未收到对端心跳即判定断连。
@@ -128,6 +124,10 @@ impl SessionRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::devices::{DeviceStore, PairedDevice};
+    use crate::protocol::{Message, PROTOCOL_VERSION};
+    use std::fs;
+    use std::path::PathBuf;
 
     #[test]
     fn heartbeat_timeout_marks_disconnected() {
@@ -199,7 +199,7 @@ mod tests {
         fs::create_dir_all(&dir).expect("创建临时目录失败");
         let path: PathBuf = dir.join("devices.json");
 
-        let mut store = DeviceStore::load(path.clone());
+        let mut store = DeviceStore::load(Some(path.clone()));
         store.add(PairedDevice {
             id: "device-0001".to_string(),
             name: "Pixel".to_string(),
@@ -211,7 +211,7 @@ mod tests {
         store.clear();
         store.save().expect("保存失败");
 
-        let reloaded = DeviceStore::load(path);
+        let reloaded = DeviceStore::load(Some(path));
         assert!(reloaded.list().is_empty(), "解绑后已配对凭据不应残留");
         fs::remove_dir_all(&dir).ok();
     }
