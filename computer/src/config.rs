@@ -160,4 +160,22 @@ mod tests {
         assert_eq!(loaded.history_limit, Config::default().history_limit);
         fs::remove_dir_all(&dir).ok();
     }
+
+    /// toggle_persists：关闭自动复制/提示后落盘，重载仍保持关闭，其余字段保持默认。
+    #[test]
+    fn toggle_persists() {
+        let dir = temp_dir("toggle");
+        let path = dir.join("config.json");
+        let mut config = Config::default();
+        config.auto_copy = false;
+        config.notify = false;
+        config.save_to(&path).expect("保存失败");
+
+        let reloaded = Config::load_from(Some(&path));
+        assert!(!reloaded.auto_copy, "自动复制关闭后应被持久化");
+        assert!(!reloaded.notify, "提示关闭后应被持久化");
+        assert_eq!(reloaded.port, DEFAULT_PORT);
+        assert_eq!(reloaded.history_limit, DEFAULT_HISTORY_LIMIT);
+        fs::remove_dir_all(&dir).ok();
+    }
 }

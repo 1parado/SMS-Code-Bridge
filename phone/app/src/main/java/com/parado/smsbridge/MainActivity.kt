@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ListView
 import android.widget.TextView
@@ -16,6 +17,8 @@ import com.parado.smsbridge.history.SharedPreferencesHistoryRepository
 import com.parado.smsbridge.net.UdpSender
 import com.parado.smsbridge.pairing.PairingClient
 import com.parado.smsbridge.protocol.Protocol
+import com.parado.smsbridge.settings.SettingViewModel
+import com.parado.smsbridge.settings.SharedPreferencesSettingRepository
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -35,6 +38,8 @@ class MainActivity : Activity() {
     private lateinit var unbindButton: Button
     private lateinit var historyList: ListView
     private lateinit var clearHistoryButton: Button
+    private lateinit var autoForwardCheckbox: CheckBox
+    private lateinit var notifyCheckbox: CheckBox
 
     private val stateMachine = PairingClient.StateMachine()
 
@@ -43,6 +48,8 @@ class MainActivity : Activity() {
     private var port: Int = 0
 
     private lateinit var history: HistoryViewModel
+    private lateinit var settings: SettingViewModel
+    private lateinit var handler: CodeHandler
     private var unsubscribe: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,10 +62,19 @@ class MainActivity : Activity() {
         unbindButton = findViewById(R.id.unbindButton)
         historyList = findViewById(R.id.historyList)
         clearHistoryButton = findViewById(R.id.clearHistoryButton)
+        autoForwardCheckbox = findViewById(R.id.autoForwardCheckbox)
+        notifyCheckbox = findViewById(R.id.notifyCheckbox)
         val hostInput = findViewById<EditText>(R.id.hostInput)
         val portInput = findViewById<EditText>(R.id.portInput)
 
         history = HistoryViewModel(SharedPreferencesHistoryRepository.fromContext(this))
+        settings = SettingViewModel(SharedPreferencesSettingRepository.fromContext(this))
+        handler = CodeHandler(history, settings)
+
+        autoForwardCheckbox.isChecked = settings.current().autoForward()
+        notifyCheckbox.isChecked = settings.current().notify()
+        autoForwardCheckbox.setOnCheckedChangeListener { _, checked -> settings.setAutoForward(checked) }
+        notifyCheckbox.setOnCheckedChangeListener { _, checked -> settings.setNotify(checked) }
 
         pairButton.setOnClickListener {
             host = hostInput.text.toString().trim()
@@ -94,8 +110,12 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         unsubscribe = CodeBus.subscribe { code ->
-            history.add(code, System.currentTimeMillis())
-            sendCode(code)
+            handler.handle(
+                code,
+                System.currentTimeMillis(),
+                onForward = { sendCode(it) },
+                onNotify = { toast("已发送验证码到电脑") },
+            )
             refreshHistory()
         }
     }
@@ -164,5 +184,9 @@ class MainActivity : Activity() {
     private fun show(text: String) {
         Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
         statusText.text = text
+    }
+
+    private fun toast(text: String) {
+        Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
     }
 }
