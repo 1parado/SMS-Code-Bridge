@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 历史行：时间（灰）+ 验证码（蓝色大字）+ 复制按钮 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingVertical="11dp">
+
+    <TextView
+        android:id="@+id/historyTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#9AA3AF"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/historyCode"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_weight="1"
+        android:gravity="end"
+        android:letterSpacing="0.15"
+        android:textColor="#1A73E8"
+        android:textSize="17sp"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/historyCopy"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="8dp"
+        android:background="@android:color/transparent"
+        android:minWidth="0dp"
+        android:padding="0dp"
+        android:text="📋"
+        android:textSize="15sp" />
+
+</LinearLayout>

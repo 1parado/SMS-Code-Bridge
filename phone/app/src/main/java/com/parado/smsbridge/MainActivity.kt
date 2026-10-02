@@ -2,15 +2,22 @@ package com.parado.smsbridge
 
 import android.Manifest
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.view.View
-import android.widget.ArrayAdapter
+import android.view.ViewGroup
+import android.widget.BaseAdapter
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ListView
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import com.parado.smsbridge.forward.ForwardService
@@ -48,9 +55,10 @@ class MainActivity : Activity() {
     private lateinit var pairButton: Button
     private lateinit var unbindButton: Button
     private lateinit var historyList: ListView
+    private lateinit var historyEmpty: View
     private lateinit var clearHistoryButton: Button
-    private lateinit var autoForwardCheckbox: CheckBox
-    private lateinit var notifyCheckbox: CheckBox
+    private lateinit var autoForwardCheckbox: Switch
+    private lateinit var notifyCheckbox: Switch
     private lateinit var discoverButton: Button
     private lateinit var hostInput: EditText
     private lateinit var portInput: EditText
@@ -76,6 +84,7 @@ class MainActivity : Activity() {
         pairButton = findViewById(R.id.pairButton)
         unbindButton = findViewById(R.id.unbindButton)
         historyList = findViewById(R.id.historyList)
+        historyEmpty = findViewById(R.id.historyEmpty)
         clearHistoryButton = findViewById(R.id.clearHistoryButton)
         autoForwardCheckbox = findViewById(R.id.autoForwardCheckbox)
         notifyCheckbox = findViewById(R.id.notifyCheckbox)
@@ -298,7 +307,7 @@ class MainActivity : Activity() {
         SessionState.update(host, port, secretHex)
         PairingStore.create(host, port, secretHex)?.let(pairingRepo::save)
         ForwardService.start(this)
-        statusText.text = message
+        renderPill(message, 0xFF22B573.toInt())
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
@@ -338,21 +347,56 @@ class MainActivity : Activity() {
         }
     }
 
-    /** 状态行：结合连接在线情况展示。 */
+    /** 状态行：状态胶囊（圆点颜色随在线状态变化）。 */
     private fun refreshStatus() {
-        statusText.text = when {
-            !SessionState.isPaired() -> "未配对"
-            SessionState.online -> "已配对（在线）"
-            else -> "已配对（连接中…）"
+        when {
+            !SessionState.isPaired() -> renderPill("未配对", 0xFFC4CAD2.toInt())
+            SessionState.online -> renderPill("已配对（在线）", 0xFF22B573.toInt())
+            else -> renderPill("已配对（连接中…）", 0xFFF4B400.toInt())
+        }
+    }
+
+    /** 渲染状态胶囊：圆点着色 + 文案（不写日志、只展示）。 */
+    private fun renderPill(text: String, dotColor: Int) {
+        val dot = "●  "
+        val spannable = SpannableString(dot + text)
+        spannable.setSpan(
+            ForegroundColorSpan(dotColor),
+            0,
+            dot.length,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+        )
+        statusText.text = spannable
+    }
+
+    /** 历史列表适配器：时间 + 蓝色大字验证码 + 一键复制。 */
+    private inner class HistoryAdapter : BaseAdapter() {
+        private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+
+        override fun getCount(): Int = history.current().entries().size
+        override fun getItem(position: Int) = history.current().entries()[position]
+        override fun getItemId(position: Int): Long = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val row = convertView ?: layoutInflater.inflate(R.layout.item_history, parent, false)
+            val entry = getItem(position)
+            row.findViewById<TextView>(R.id.historyTime).text = timeFmt.format(Date(entry.ts))
+            row.findViewById<TextView>(R.id.historyCode).text = entry.code
+            row.findViewById<Button>(R.id.historyCopy).setOnClickListener {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("code", entry.code))
+                Toast.makeText(this@MainActivity, "已复制 ${entry.code}", Toast.LENGTH_SHORT).show()
+            }
+            return row
         }
     }
 
     private fun refreshHistory() {
-        val timeFmt = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
-        val items = history.current().entries().map { e ->
-            "${timeFmt.format(Date(e.ts))}   ${e.code}"
-        }
-        historyList.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, items)
+        val adapter = HistoryAdapter()
+        historyList.adapter = adapter
+        val empty = adapter.count == 0
+        historyEmpty.visibility = if (empty) View.VISIBLE else View.GONE
+        historyList.visibility = if (empty) View.GONE else View.VISIBLE
     }
 
     private fun show(text: String) {

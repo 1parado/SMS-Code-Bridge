@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 主按钮：蓝色渐变（左浅右深），圆角 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <gradient android:angle="0" android:startColor="#2B7FE0" android:endColor="#155FB8" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:angle="0" android:startColor="#4A9DF8" android:endColor="#1A73E8" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+</selector>

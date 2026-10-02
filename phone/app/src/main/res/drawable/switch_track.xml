@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Switch 轨道配色：开启浅绿、关闭浅灰 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true" android:color="#B9EBC7" />
+    <item android:color="#DEE2E7" />
+</selector>

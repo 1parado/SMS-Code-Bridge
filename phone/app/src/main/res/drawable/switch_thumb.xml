@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Switch 开关配色：开启绿色、关闭浅灰 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true" android:color="#34C759" />
+    <item android:color="#F4F5F7" />
+</selector>

@@ -1,41 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 极简白色卡片布局：大留白、圆角卡片、柔和强调色（PRD 设计规范） -->
+<!-- 极简白卡片布局：顶部应用标题 + 状态胶囊 + 三张功能卡片（设计稿 1:1） -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#F6F7F9"
     android:orientation="vertical"
-    android:padding="20dp">
+    android:paddingHorizontal="18dp"
+    android:paddingTop="20dp"
+    android:paddingBottom="14dp">
 
-    <!-- 状态卡 -->
-    <LinearLayout
+    <!-- 应用标题区 -->
+    <TextView
+        android:id="@+id/appTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/card_bg"
-        android:elevation="2dp"
         android:gravity="center"
-        android:orientation="vertical"
-        android:padding="20dp">
+        android:text="SMS Code Bridge"
+        android:textColor="#111827"
+        android:textSize="22sp"
+        android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/statusText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="未配对"
-            android:textColor="#1F2937"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+    <TextView
+        android:id="@+id/aboutText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:gravity="center"
+        android:textColor="#9AA3AF"
+        android:textSize="12sp" />
 
-        <TextView
-            android:id="@+id/aboutText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:textColor="#9AA3AF"
-            android:textSize="12sp" />
-    </LinearLayout>
+    <!-- 状态胶囊（圆点颜色随在线状态变化） -->
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/pill_bg"
+        android:paddingHorizontal="18dp"
+        android:paddingVertical="8dp"
+        android:text="未配对"
+        android:textColor="#1F2937"
+        android:textSize="14sp" />
 
-    <!-- 连接卡 -->
+    <!-- 连接电脑卡 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -43,14 +51,14 @@
         android:background="@drawable/card_bg"
         android:elevation="2dp"
         android:orientation="vertical"
-        android:padding="18dp">
+        android:padding="16dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="连接电脑"
-            android:textColor="#6B7280"
-            android:textSize="13sp"
+            android:text="🖥 连接电脑"
+            android:textColor="#111827"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <Button
@@ -58,43 +66,82 @@
             android:layout_width="match_parent"
             android:layout_height="46dp"
             android:layout_marginTop="12dp"
-            android:background="@drawable/btn_secondary"
-            android:text="自动寻找电脑"
+            android:background="@drawable/btn_outline"
+            android:text="🔍  自动寻找电脑"
             android:textAllCaps="false"
             android:textColor="#1F2937"
             android:textSize="15sp" />
 
+        <!-- IP 地址行：标签左、值右 -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             android:layout_marginTop="10dp"
-            android:orientation="horizontal">
+            android:background="@drawable/btn_outline"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="IP 地址"
+                android:textColor="#9AA3AF"
+                android:textSize="14sp" />
 
             <EditText
                 android:id="@+id/hostInput"
                 android:layout_width="0dp"
-                android:layout_height="44dp"
-                android:layout_marginEnd="8dp"
-                android:layout_weight="2"
-                android:background="@drawable/btn_secondary"
-                android:hint="电脑端 IP"
+                android:layout_height="match_parent"
+                android:layout_marginStart="18dp"
+                android:layout_weight="1"
+                android:background="@null"
+                android:gravity="end|center_vertical"
+                android:hint="192.168.x.x"
                 android:inputType="text"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
                 android:singleLine="true"
+                android:textColor="#1F2937"
+                android:textColorHint="#C4CAD2"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <!-- 端口行 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/btn_outline"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="端口"
+                android:textColor="#9AA3AF"
                 android:textSize="14sp" />
 
             <EditText
                 android:id="@+id/portInput"
                 android:layout_width="0dp"
-                android:layout_height="44dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="18dp"
                 android:layout_weight="1"
-                android:background="@drawable/btn_secondary"
-                android:hint="端口"
+                android:background="@null"
+                android:gravity="end|center_vertical"
+                android:hint="45876"
                 android:inputType="number"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
                 android:singleLine="true"
+                android:textColor="#1F2937"
+                android:textColorHint="#C4CAD2"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="✏️"
                 android:textSize="14sp" />
         </LinearLayout>
 
@@ -103,60 +150,78 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginTop="12dp"
-            android:background="@drawable/btn_primary"
-            android:text="一键配对（电脑端确认，适合可信网络）"
+            android:background="@drawable/btn_gradient_primary"
+            android:text="🔗  一键配对（电脑端确认，适合可信网络）"
             android:textAllCaps="false"
             android:textColor="#FFFFFF"
-            android:textSize="15sp" />
+            android:textSize="14sp" />
 
+        <!-- 配对码行：锁图标 + 输入 + 分隔线 + 文字按钮 -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             android:layout_marginTop="10dp"
+            android:background="@drawable/btn_soft"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="6dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔒"
+                android:textSize="14sp" />
 
             <EditText
                 android:id="@+id/codeInput"
                 android:layout_width="0dp"
-                android:layout_height="44dp"
-                android:layout_marginEnd="8dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
                 android:layout_weight="1"
-                android:background="@drawable/btn_secondary"
-                android:hint="6 位配对码"
+                android:background="@null"
+                android:hint="配对码 (6位)"
                 android:inputType="number"
                 android:maxLength="6"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
                 android:singleLine="true"
-                android:textSize="14sp" />
+                android:textColor="#1F2937"
+                android:textColorHint="#C4CAD2"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:layout_marginHorizontal="10dp"
+                android:background="#DDE1E6" />
 
             <Button
                 android:id="@+id/pairButton"
                 android:layout_width="wrap_content"
-                android:layout_height="44dp"
-                android:background="@drawable/btn_secondary"
-                android:minWidth="96dp"
+                android:layout_height="match_parent"
+                android:background="@android:color/transparent"
+                android:minWidth="0dp"
+                android:paddingHorizontal="12dp"
                 android:text="配对码配对"
                 android:textAllCaps="false"
                 android:textColor="#1A73E8"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <Button
             android:id="@+id/unbindButton"
             android:layout_width="match_parent"
-            android:layout_height="42dp"
+            android:layout_height="44dp"
             android:layout_marginTop="10dp"
-            android:background="@android:color/transparent"
-            android:text="断开配对并清除密钥"
+            android:background="@drawable/btn_danger_soft"
+            android:text="🗑  断开配对并清除密钥"
             android:textAllCaps="false"
             android:textColor="#D93025"
             android:textSize="14sp"
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- 偏好卡 -->
+    <!-- 设置卡 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -164,27 +229,94 @@
         android:background="@drawable/card_bg"
         android:elevation="2dp"
         android:orientation="vertical"
-        android:padding="14dp">
+        android:padding="16dp">
 
-        <CheckBox
-            android:id="@+id/autoForwardCheckbox"
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="设置"
+            android:textColor="#111827"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="自动转发验证码到电脑"
-            android:textColor="#1F2937"
-            android:textSize="15sp" />
+            android:layout_marginTop="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <CheckBox
-            android:id="@+id/notifyCheckbox"
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="自动转发验证码到电脑"
+                    android:textColor="#1F2937"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="检测到验证码时自动转发"
+                    android:textColor="#9AA3AF"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <Switch
+                android:id="@+id/autoForwardCheckbox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:showText="false"
+                android:thumbTint="@drawable/switch_thumb"
+                android:trackTint="@drawable/switch_track" />
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="转发成功后轻提示"
-            android:textColor="#1F2937"
-            android:textSize="15sp" />
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="转发成功后轻提示"
+                    android:textColor="#1F2937"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="在手机上显示转发成功提示"
+                    android:textColor="#9AA3AF"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <Switch
+                android:id="@+id/notifyCheckbox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:showText="false"
+                android:thumbTint="@drawable/switch_thumb"
+                android:trackTint="@drawable/switch_track" />
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- 历史卡 -->
+    <!-- 验证码历史卡 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -193,21 +325,57 @@
         android:background="@drawable/card_bg"
         android:elevation="2dp"
         android:orientation="vertical"
-        android:padding="14dp">
+        android:padding="16dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="验证码历史"
-            android:textColor="#6B7280"
-            android:textSize="13sp"
+            android:textColor="#111827"
+            android:textSize="15sp"
             android:textStyle="bold" />
+
+        <!-- 空状态 -->
+        <LinearLayout
+            android:id="@+id/historyEmpty"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:background="@drawable/empty_circle"
+                android:gravity="center"
+                android:text="🔐"
+                android:textSize="26sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="暂无验证码记录"
+                android:textColor="#1F2937"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="配对成功后，验证码将在这里显示"
+                android:textColor="#9AA3AF"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <ListView
             android:id="@+id/historyList"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="4dp"
             android:layout_weight="1"
             android:divider="@null"
             android:dividerHeight="0dp" />
@@ -215,13 +383,13 @@
         <Button
             android:id="@+id/clearHistoryButton"
             android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/btn_secondary"
-            android:text="清空历史"
+            android:layout_height="44dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/btn_soft"
+            android:text="🗑  清空历史"
             android:textAllCaps="false"
             android:textColor="#6B7280"
-            android:textSize="13sp" />
+            android:textSize="14sp" />
     </LinearLayout>
 
 </LinearLayout>
