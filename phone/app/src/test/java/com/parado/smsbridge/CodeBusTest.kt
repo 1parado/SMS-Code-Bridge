@@ -66,4 +66,51 @@ class CodeBusTest {
         bad()
         good()
     }
+
+    /** 丢码自愈：无订阅者时 emit 缓存，下一位订阅者注册时立即重放。 */
+    @Test
+    fun emit_without_listener_is_replayed_to_next_subscriber() {
+        CodeBus.clear()
+        // 模拟进程冷启动：广播先到、服务还没订阅
+        CodeBus.emit("482913")
+
+        val received = mutableListOf<String>()
+        val unsubscribe = CodeBus.subscribe { received.add(it) }
+        assertEquals(listOf("482913"), received)
+        unsubscribe()
+    }
+
+    /** 暂存只补发一次，不会被后续订阅者重复消费。 */
+    @Test
+    fun pending_is_consumed_once() {
+        CodeBus.clear()
+        CodeBus.emit("482913")
+
+        val first = mutableListOf<String>()
+        val second = mutableListOf<String>()
+        val unsubscribeFirst = CodeBus.subscribe { first.add(it) }
+        val unsubscribeSecond = CodeBus.subscribe { second.add(it) }
+
+        assertEquals(listOf("482913"), first)
+        assertTrue(second.isEmpty())
+        unsubscribeFirst()
+        unsubscribeSecond()
+    }
+
+    /** 有订阅者时正常分发，不再缓存。 */
+    @Test
+    fun emit_with_listeners_does_not_cache() {
+        CodeBus.clear()
+        val received = mutableListOf<String>()
+        val unsubscribe = CodeBus.subscribe { received.add(it) }
+
+        CodeBus.emit("111111")
+        unsubscribe()
+
+        // 取消订阅后无新订阅者：不应重放出已分发的旧值
+        val late = mutableListOf<String>()
+        val unsubscribeLate = CodeBus.subscribe { late.add(it) }
+        assertTrue(late.isEmpty())
+        unsubscribeLate()
+    }
 }
