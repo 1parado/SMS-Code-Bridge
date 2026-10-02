@@ -240,6 +240,7 @@ Release 只上传两个文件：Windows 端可执行文件、Android 端 APK，�
 | v0.4.0 | Windows 托盘常驻、Android 正式签名支持 | exe 325KB / apk 42KB |
 | v0.4.1 | 修复托盘图标 1813（资源名 "tray-default"），图标改用 icon.png 多尺寸 ICO | exe 363KB / apk 42KB |
 | v0.5.0 | 协议 v2（配对码不上网、验证码加密传输、解绑认证）、配对凭据持久化、配对码自动重发 | exe 386KB / apk 45KB |
+| v0.6.0 | 协议 v3 一键配对、前台服务后台转发、Windows 无控制台弹窗交互、两端 UI 卡片化 | exe 398KB / apk 50KB |
 
 ## 实际 PR 编号映射
 
