@@ -263,8 +263,11 @@ Release 只上传两个文件：Windows 端可执行文件、Android 端 APK，�
 | PR-25 | 手机端配对凭据持久化（PairingStore + SharedPreferences），重启自动恢复配对状态与地址 | PR-PLAN 待办落实 |
 | PR-26 | 电脑端托盘「显示配对码」在过期/已消费/超次后自动重发新码，无需重启 | 配对可用性打磨 |
 | v0.5.0 | 版本号两端统一 0.5.0，发布 Release | 里程碑发布 |
+| PR-27 | 协议 v3：一键配对（pair_open_request / pair_grant，电脑端托盘确认 60 秒窗口，随机会话密钥单播下发）；应答来源校验 | 配对体验优化 |
+| PR-28 | Android 前台转发服务（ForwardService）：转发与心跳常驻，界面退后台/锁屏不再断链；转发职责从 Activity 迁到服务；SessionState 单一事实源 | 核心链路修复 |
+| PR-29 | 体验与 UI：Windows release 隐藏控制台、关键事件系统弹窗、托盘新增「同意配对/最近验证码」；手机端卡片式极简界面；新增 POST_NOTIFICATIONS / FOREGROUND_SERVICE 权限 | 用户体验迭代 |
 
 ## 剩余事项
 
-- **端到端真机验收**：配对、延迟、静默、解绑、不影响正常短信（清单见 `docs/acceptance-v0.4.md`；协议 v2 下需重新验收配对与验证码链路，v0.5 需覆盖重启恢复场景）
+- **端到端真机验收**：配对、延迟、静默、解绑、不影响正常短信（v0.6 需覆盖：一键配对、锁屏/后台转发、前台服务通知）
 - **正式签名**：Android release 在 CI 未配置 keystore Secrets 时回退调试签名，需配置 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD`

@@ -39,7 +39,9 @@
 - `READ_SMS`（仅用于读取验证码短信，处理完立即释放）
 - `INTERNET`（仅用于局域网通信）
 - `ACCESS_WIFI_STATE` / `ACCESS_NETWORK_STATE`（检测局域网状态）
-- 禁止申请：存储、通讯录、位置、相机、麦克风、通知监听（除非绝对必要且可关闭）、后台无限制运行等高危权限
+- `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_DATA_SYNC`（v0.6 起：前台转发服务必需，保证界面退后台后转发链路不断）
+- `POST_NOTIFICATIONS`（仅用于展示前台服务自身的常驻通知，不做任何通知监听，Android 13+ 可拒绝）
+- 禁止申请：存储、通讯录、位置、相机、麦克风、通知监听、后台无限制运行等高危权限
 
 ### Windows 端
 - 仅需要网络权限（局域网）
