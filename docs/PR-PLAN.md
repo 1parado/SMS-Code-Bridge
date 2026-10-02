@@ -258,8 +258,11 @@ Release 只上传两个文件：Windows 端可执行文件、Android 端 APK，�
 | PR-18 | 版本号一致性与关于信息 | 拆分自 PR-17 |
 | PR-19 ~ PR-22 | 托盘常驻（菜单/channel、主循环装配、rc 图标资源）、签名支持、版本号统一 0.4.0 | 顺延项 v0.4 |
 | PR-23 | 托盘图标 1813 修复：资源名 "tray-default"、icon.png 多尺寸 ICO，版本 0.4.1 | 缺陷修复 |
+| PR-24 | 协议 v2：配对码不上网（PBKDF2 证明）、验证码 AES-256-GCM 加密、解绑认证、配对尝试限制；手机端真实配对握手（等待并校验 PairResponse）与主线程网络修复 | 协议安全迭代（参考 wx-ime-sdk） |
 
 ## 剩余事项
 
-- **端到端真机验收**：配对、延迟、静默、解绑、不影响正常短信（清单见 `docs/acceptance-v0.4.md`）
+- **端到端真机验收**：配对、延迟、静默、解绑、不影响正常短信（清单见 `docs/acceptance-v0.4.md`；协议 v2 下需重新验收配对与验证码链路）
 - **正式签名**：Android release 在 CI 未配置 keystore Secrets 时回退调试签名，需配置 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD`
+- **手机端配对凭据持久化**：配对状态目前仅在内存中，App 重启后需重新配对
+- **下一版本号**：协议 v2 与 v0.4.x 不兼容，发布时建议顺延 0.5.0（`shared/version.txt` 跨端硬锁定）
