@@ -21,6 +21,9 @@ import com.parado.smsbridge.net.Discovery
 import com.parado.smsbridge.net.DiscoveryClient
 import com.parado.smsbridge.net.UdpSender
 import com.parado.smsbridge.pairing.PairingClient
+import com.parado.smsbridge.pairing.PairingRepository
+import com.parado.smsbridge.pairing.PairingStore
+import com.parado.smsbridge.pairing.SharedPreferencesPairingRepository
 import com.parado.smsbridge.protocol.Crypto
 import com.parado.smsbridge.protocol.Protocol
 import com.parado.smsbridge.settings.SettingViewModel
@@ -60,6 +63,7 @@ class MainActivity : Activity() {
     private lateinit var settings: SettingViewModel
     private lateinit var handler: CodeHandler
     private lateinit var monitor: ConnectionMonitor
+    private lateinit var pairingRepo: PairingRepository
     private var unsubscribe: (() -> Unit)? = null
 
     /** 本机设备号（与电脑端配对时登记的 device_id 保持一致）。 */
@@ -103,6 +107,17 @@ class MainActivity : Activity() {
         handler = CodeHandler(history, settings)
         monitor = ConnectionMonitor(heartbeatTimeoutMs, 1_000, 2, 30_000)
 
+        // 恢复已保存的配对凭据：重启后无需重新配对，地址回填输入框
+        pairingRepo = SharedPreferencesPairingRepository.fromContext(this)
+        pairingRepo.load()?.let { saved ->
+            stateMachine.succeed(saved.secretHex)
+            host = saved.host
+            port = saved.port
+            hostInput.setText(saved.host)
+            portInput.setText(saved.port.toString())
+            statusText.text = "已配对（恢复）"
+        }
+
         autoForwardCheckbox.isChecked = settings.current().autoForward()
         notifyCheckbox.isChecked = settings.current().notify()
         autoForwardCheckbox.setOnCheckedChangeListener { _, checked -> settings.setAutoForward(checked) }
@@ -124,9 +139,10 @@ class MainActivity : Activity() {
         }
 
         unbindButton.setOnClickListener {
-            // 先用会话密钥计算解绑认证，再清理本地状态
+            // 先用会话密钥计算解绑认证，再清理本地状态与持久化凭据
             stateMachine.session?.let { session -> sendUnpair(session.secretHex) }
             stateMachine.unbind()
+            pairingRepo.clear()
             stopHeartbeat()
             monitor = ConnectionMonitor(heartbeatTimeoutMs, 1_000, 2, 30_000)
             refresh()
@@ -213,6 +229,9 @@ class MainActivity : Activity() {
     private fun sendPairRequest(code: String) {
         if (!stateMachine.start()) return
         show("配对中…")
+        // 捕获请求时的地址：保存凭据必须与实际配对所用地址一致
+        val requestHost = host
+        val requestPort = port
         Thread {
             val saltHex = PairingClient.createSaltHex()
             val salt = Crypto.hexToBytes(saltHex) ?: ByteArray(0)
@@ -221,7 +240,7 @@ class MainActivity : Activity() {
                 Protocol.Message.PairRequest(Protocol.VERSION, deviceId, saltHex, proofHex),
             )
             val response = UdpSender
-                .sendAndWait(host, port, request.toByteArray(Charsets.UTF_8), pairResponseTimeoutMs)
+                .sendAndWait(requestHost, requestPort, request.toByteArray(Charsets.UTF_8), pairResponseTimeoutMs)
                 ?.let { bytes -> Protocol.parse(String(bytes, Charsets.UTF_8)) }
                 as? Protocol.Message.PairResponse
             val secretHex = PairingClient.deriveSecretHex(proofHex)
@@ -231,6 +250,9 @@ class MainActivity : Activity() {
             runOnUiThread {
                 if (paired) {
                     stateMachine.succeed(secretHex)
+                    // 凭据仅存本机，重启后自动恢复配对状态
+                    PairingStore.create(requestHost, requestPort, secretHex)
+                        ?.let(pairingRepo::save)
                     statusText.text = "已配对（在线）"
                     startHeartbeat()
                 } else {
