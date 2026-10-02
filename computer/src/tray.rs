@@ -8,8 +8,12 @@ use tray_item::{IconSource, TrayItem};
 /// 托盘菜单动作。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayAction {
-    /// 显示当前配对码（打印到控制台）
+    /// 显示当前配对码（弹窗展示；失效时自动重发）
     ShowPairingCode,
+    /// 同意最近的一键配对请求（60 秒窗口内）
+    ApprovePairing,
+    /// 查看最近收到的验证码（弹窗展示）
+    ShowRecentCodes,
     /// 退出程序
     Quit,
 }
@@ -18,6 +22,8 @@ pub enum TrayAction {
 pub fn menu_items() -> Vec<(&'static str, TrayAction)> {
     vec![
         ("显示配对码", TrayAction::ShowPairingCode),
+        ("同意配对", TrayAction::ApprovePairing),
+        ("最近验证码", TrayAction::ShowRecentCodes),
         ("退出", TrayAction::Quit),
     ]
 }
@@ -63,11 +69,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn menu_contains_show_code_and_quit() {
+    fn menu_contains_all_actions() {
         let items = menu_items();
-        assert_eq!(items.len(), 2);
+        assert_eq!(items.len(), 4);
         assert_eq!(items[0].1, TrayAction::ShowPairingCode);
-        assert_eq!(items[1].1, TrayAction::Quit);
+        assert_eq!(items[1].1, TrayAction::ApprovePairing);
+        assert_eq!(items[2].1, TrayAction::ShowRecentCodes);
+        assert_eq!(items[3].1, TrayAction::Quit);
     }
 
     #[test]

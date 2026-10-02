@@ -48,6 +48,12 @@ pub fn generate_code() -> String {
     format!("{:06}", rng.gen_range(0..1_000_000u32))
 }
 
+/// 生成 32 字节随机会话密钥（一键配对：电脑端确认后直接生成并单播下发）。
+pub fn generate_secret() -> [u8; 32] {
+    let mut rng = rand::thread_rng();
+    rng.gen()
+}
+
 /// 配对证明：PBKDF2-HMAC-SHA256(配对码, 盐)。
 pub fn derive_proof(code: &str, salt: &[u8], iterations: u32) -> [u8; 32] {
     let mut out = [0u8; 32];
@@ -392,6 +398,14 @@ mod tests {
         let proof = to_hex(&derive_proof(&code, b"0123456789abcdef", 100));
         assert!(manager.verify(&proof, b"0123456789abcdef", 1_100).is_some());
         assert!(!manager.has_active_challenge(1_100));
+    }
+
+    #[test]
+    fn generated_secret_is_random_and_sufficient_length() {
+        let a = generate_secret();
+        let b = generate_secret();
+        assert_eq!(a.len(), 32);
+        assert_ne!(a, b, "随机会话密钥不应重复");
     }
 
     #[test]

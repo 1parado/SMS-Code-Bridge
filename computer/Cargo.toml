@@ -1,6 +1,6 @@
 [package]
 name = "sms-code-bridge"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 description = "SMS Code Bridge - Windows 端：接收局域网验证码并写入剪贴板"
 
@@ -19,6 +19,8 @@ rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
+# 系统弹窗通知（release 无控制台时的用户触达），复用依赖树中已有版本
+windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
 tray-item = "0.10"
 
 [profile.release]

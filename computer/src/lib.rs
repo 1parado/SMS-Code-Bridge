@@ -11,6 +11,8 @@ pub mod connection;
 pub mod devices;
 pub mod discovery;
 pub mod history;
+#[cfg(windows)]
+pub mod notifications;
 pub mod pairing;
 pub mod protocol;
 pub mod receiver;
