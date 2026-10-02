@@ -209,6 +209,19 @@ impl PairingManager {
     pub fn reset(&mut self) {
         self.challenge = None;
     }
+
+    /// 当前挑战是否仍然有效（存在、未消费、未过期、未超次）。
+    /// 用于托盘「显示配对码」判断是否需要重新发放。
+    pub fn has_active_challenge(&self, now_ms: i64) -> bool {
+        match &self.challenge {
+            Some(challenge) => {
+                !challenge.consumed
+                    && challenge.attempts < MAX_ATTEMPTS
+                    && now_ms.saturating_sub(challenge.created_at_ms) <= self.ttl_ms
+            }
+            None => false,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -361,6 +374,24 @@ mod tests {
         manager.reset();
         let proof = to_hex(&derive_proof("123456", b"0123456789abcdef", 100));
         assert!(manager.verify(&proof, b"0123456789abcdef", 1_100).is_none());
+    }
+
+    #[test]
+    fn active_challenge_tracking() {
+        let mut manager = PairingManager::with_iterations(DEFAULT_TTL_MS, 100);
+        // 未发放挑战：无效
+        assert!(!manager.has_active_challenge(0));
+        // 有效期内：有效
+        manager.issue(1_000);
+        assert!(manager.has_active_challenge(1_000 + DEFAULT_TTL_MS));
+        // 过期后：无效
+        assert!(!manager.has_active_challenge(1_000 + DEFAULT_TTL_MS + 1));
+        // 消费后：无效
+        let mut manager = PairingManager::with_iterations(DEFAULT_TTL_MS, 100);
+        let code = manager.issue(1_000);
+        let proof = to_hex(&derive_proof(&code, b"0123456789abcdef", 100));
+        assert!(manager.verify(&proof, b"0123456789abcdef", 1_100).is_some());
+        assert!(!manager.has_active_challenge(1_100));
     }
 
     #[test]

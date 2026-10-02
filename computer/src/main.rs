@@ -32,7 +32,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     discovery_socket.set_read_timeout_millis(200)?;
 
     let mut pairing = PairingManager::new(DEFAULT_TTL_MS);
-    let pairing_code = pairing.issue(now_ms());
+    let mut pairing_code = pairing.issue(now_ms());
 
     let devices_path = DeviceStore::devices_path();
     let mut devices = DeviceStore::load(devices_path);
@@ -78,7 +78,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if let Ok(action) = tray_events.events.try_recv() {
             match action {
                 TrayAction::ShowPairingCode => {
-                    println!("配对码: {pairing_code}（如已过期请重启程序刷新）");
+                    // 挑战过期、已消费或超次时重新发放，无需重启程序
+                    if !pairing.has_active_challenge(now_ms()) {
+                        pairing_code = pairing.issue(now_ms());
+                        println!("原配对码已失效，已重新发放");
+                    }
+                    println!("配对码: {pairing_code}（2 分钟内有效，配对成功即失效）");
                 }
                 TrayAction::Quit => {
                     println!("收到退出请求，正在清理…");
