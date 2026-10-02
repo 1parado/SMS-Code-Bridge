@@ -11,10 +11,12 @@ import org.json.JSONObject
  */
 object Protocol {
 
-    const val VERSION = 2
+    const val VERSION = 3
 
     const val TYPE_PAIR_REQUEST = "pair_request"
     const val TYPE_PAIR_RESPONSE = "pair_response"
+    const val TYPE_PAIR_OPEN_REQUEST = "pair_open_request"
+    const val TYPE_PAIR_GRANT = "pair_grant"
     const val TYPE_CODE = "code"
     const val TYPE_HEARTBEAT = "heartbeat"
     const val TYPE_UNPAIR = "unpair"
@@ -39,6 +41,21 @@ object Protocol {
             override val v: Int,
             val ok: Boolean,
             val sessionId: String?,
+        ) : Message()
+
+        /** 手机 → 电脑：一键配对请求（可信网络；电脑端用户托盘确认后才下发凭据） */
+        data class PairOpenRequest(
+            override val v: Int,
+            val deviceId: String,
+        ) : Message()
+
+        /** 电脑 → 手机：一键配对同意，单播下发会话密钥（明文，见 PROTOCOL.md 威胁模型） */
+        data class PairGrant(
+            override val v: Int,
+            val deviceId: String,
+            val secretHex: String,
+            /** 会话 ID，供对端做一致性展示。 */
+            val sessionId: String,
         ) : Message()
 
         /** 手机 → 电脑：验证码（密文，只含验证码本身） */
@@ -105,6 +122,20 @@ object Protocol {
                 }
             }
 
+            is Message.PairOpenRequest -> {
+                put("type", TYPE_PAIR_OPEN_REQUEST)
+                put("v", message.v)
+                put("device_id", message.deviceId)
+            }
+
+            is Message.PairGrant -> {
+                put("type", TYPE_PAIR_GRANT)
+                put("v", message.v)
+                put("device_id", message.deviceId)
+                put("secret_hex", message.secretHex)
+                put("session_id", message.sessionId)
+            }
+
             is Message.Code -> {
                 put("type", TYPE_CODE)
                 put("v", message.v)
@@ -159,6 +190,18 @@ object Protocol {
                 v,
                 json.optBoolean("ok", false),
                 if (json.isNull("session_id")) null else json.optString("session_id"),
+            )
+
+            TYPE_PAIR_OPEN_REQUEST -> Message.PairOpenRequest(
+                v,
+                json.getString("device_id"),
+            )
+
+            TYPE_PAIR_GRANT -> Message.PairGrant(
+                v,
+                json.getString("device_id"),
+                json.getString("secret_hex"),
+                json.optString("session_id"),
             )
 
             TYPE_CODE -> Message.Code(

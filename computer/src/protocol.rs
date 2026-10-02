@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 协议版本。版本不一致的消息一律拒绝处理。
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -29,6 +29,17 @@ pub enum Message {
         v: u32,
         ok: bool,
         session_id: Option<String>,
+    },
+    /// 手机 → 电脑：一键配对请求（可信网络；电脑端用户在托盘确认后才下发凭据）
+    PairOpenRequest { v: u32, device_id: String },
+    /// 电脑 → 手机：一键配对同意，单播下发会话密钥（明文，见 PROTOCOL.md 威胁模型）
+    PairGrant {
+        v: u32,
+        device_id: String,
+        /// 会话密钥（hex）。仅在对端主动请求、本机用户确认后的短窗口内单播。
+        secret_hex: String,
+        /// 会话 ID，供对端做一致性展示。
+        session_id: String,
     },
     /// 手机 → 电脑：验证码（密文，只含验证码本身）
     Code {
@@ -65,6 +76,8 @@ impl Message {
         match self {
             Message::PairRequest { v, .. }
             | Message::PairResponse { v, .. }
+            | Message::PairOpenRequest { v, .. }
+            | Message::PairGrant { v, .. }
             | Message::Code { v, .. }
             | Message::Heartbeat { v, .. }
             | Message::DiscoveryRequest { v, .. }
@@ -143,6 +156,44 @@ mod tests {
             }
             other => panic!("消息类型不符: {other:?}"),
         }
+        let encoded = message.to_json().expect("序列化失败");
+        assert_eq!(Message::from_json(&encoded).expect("回读失败"), message);
+    }
+
+    #[test]
+    fn pair_open_request_roundtrip() {
+        let raw = include_str!("../../shared/testdata/pair_open_request.json");
+        let message = Message::from_json(raw).expect("解析一键配对请求失败");
+        match &message {
+            Message::PairOpenRequest { device_id, .. } => assert_eq!(device_id, "device-0001"),
+            other => panic!("消息类型不符: {other:?}"),
+        }
+        assert!(message.is_supported());
+        let encoded = message.to_json().expect("序列化失败");
+        assert_eq!(Message::from_json(&encoded).expect("回读失败"), message);
+    }
+
+    #[test]
+    fn pair_grant_roundtrip() {
+        let raw = include_str!("../../shared/testdata/pair_grant.json");
+        let message = Message::from_json(raw).expect("解析配对授权失败");
+        match &message {
+            Message::PairGrant {
+                device_id,
+                secret_hex,
+                session_id,
+                ..
+            } => {
+                assert_eq!(device_id, "device-0001");
+                assert_eq!(
+                    secret_hex,
+                    "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+                );
+                assert_eq!(session_id, "0f5ae74e37fae0e8");
+            }
+            other => panic!("消息类型不符: {other:?}"),
+        }
+        assert!(message.is_supported());
         let encoded = message.to_json().expect("序列化失败");
         assert_eq!(Message::from_json(&encoded).expect("回读失败"), message);
     }

@@ -1,1 +1,1 @@
-{"type":"pair_request","v":2,"device_id":"device-0001","salt_hex":"30313233343536373839616263646566","proof_hex":"887fc04592766b594b2abe0b9ade1a53da0560339eb3c7d2903f38dd2000116e"}
+{"type":"pair_request","v":3,"device_id":"device-0001","salt_hex":"30313233343536373839616263646566","proof_hex":"887fc04592766b594b2abe0b9ade1a53da0560339eb3c7d2903f38dd2000116e"}

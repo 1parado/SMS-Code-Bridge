@@ -52,6 +52,35 @@ class ProtocolTest {
     }
 
     @Test
+    fun pairOpenRequestRoundtrip() {
+        val message = Protocol.parse(fixture("pair_open_request.json"))
+        assertNotNull(message)
+        message as Protocol.Message.PairOpenRequest
+        assertEquals("device-0001", message.deviceId)
+        assertTrue(Protocol.isSupported(message))
+
+        val reparsed = Protocol.parse(Protocol.toJson(message))
+        assertEquals(message, reparsed)
+    }
+
+    @Test
+    fun pairGrantRoundtrip() {
+        val message = Protocol.parse(fixture("pair_grant.json"))
+        assertNotNull(message)
+        message as Protocol.Message.PairGrant
+        assertEquals("device-0001", message.deviceId)
+        assertEquals(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            message.secretHex,
+        )
+        assertEquals("0f5ae74e37fae0e8", message.sessionId)
+        assertTrue(Protocol.isSupported(message))
+
+        val reparsed = Protocol.parse(Protocol.toJson(message))
+        assertEquals(message, reparsed)
+    }
+
+    @Test
     fun codeMessageRoundtrip() {
         val message = Protocol.parse(fixture("code_message.json"))
         assertNotNull(message)

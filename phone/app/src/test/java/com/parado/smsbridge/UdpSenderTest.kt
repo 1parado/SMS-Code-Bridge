@@ -3,6 +3,7 @@ package com.parado.smsbridge
 import com.parado.smsbridge.net.UdpSender
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -62,7 +63,10 @@ class UdpSenderTest {
                 "{\"type\":\"pair_request\"}".toByteArray(),
                 2_000,
             )
-            assertArrayEquals("pair-ok".toByteArray(), response)
+            assertNotNull(response)
+            assertArrayEquals("pair-ok".toByteArray(), response!!.bytes)
+            assertTrue("应答来源应可校验", response.isFrom("127.0.0.1"))
+            assertFalse(response.isFrom("192.0.2.99"))
         }
     }
 

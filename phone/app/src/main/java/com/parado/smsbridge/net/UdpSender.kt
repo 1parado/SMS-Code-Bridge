@@ -28,13 +28,19 @@ object UdpSender {
         }
     }
 
+    /** 一次「发送并等待」收到的应答：内容与来源地址。 */
+    data class Response(val bytes: ByteArray, val fromHost: String) {
+        /** 应答是否来自预期主机（防止同网段其他设备抢答）。 */
+        fun isFrom(host: String): Boolean = fromHost == host
+    }
+
     /**
-     * 发送一帧并等待单个应答，返回应答字节；超时或异常返回 null。
+     * 发送一帧并等待单个应答，返回应答内容与来源地址；超时或异常返回 null。
      *
-     * 用于配对这类「请求-应答」场景：应答来源不校验，
-     * 真实性由上层的会话 ID 校验（密码学验证）承担。
+     * 用于配对这类「请求-应答」场景；上层应结合 [Response.isFrom] 与
+     * 密码学校验（如会话 ID 比对）判断应答真实性。
      */
-    fun sendAndWait(host: String, port: Int, payload: ByteArray, timeoutMs: Int): ByteArray? {
+    fun sendAndWait(host: String, port: Int, payload: ByteArray, timeoutMs: Int): Response? {
         if (payload.isEmpty() || payload.size > MAX_FRAME_BYTES) return null
         if (port <= 0 || port > 65535) return null
 
@@ -47,7 +53,10 @@ object UdpSender {
                 val buffer = ByteArray(MAX_FRAME_BYTES)
                 val response = DatagramPacket(buffer, buffer.size)
                 socket.receive(response)
-                buffer.copyOf(response.length)
+                Response(
+                    buffer.copyOf(response.length),
+                    response.address?.hostAddress ?: "",
+                )
             }
         } catch (_: Exception) {
             null
