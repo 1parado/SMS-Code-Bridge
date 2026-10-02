@@ -20,6 +20,11 @@ class PermissionsManifestTest {
         "android.permission.INTERNET",
         "android.permission.ACCESS_WIFI_STATE",
         "android.permission.ACCESS_NETWORK_STATE",
+        // 前台转发服务（v0.6）：转发与心跳常驻，界面退后台不影响链路
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        // 仅展示服务自身的常驻通知，不做通知监听
+        "android.permission.POST_NOTIFICATIONS",
     )
 
     private val forbidden = setOf(
