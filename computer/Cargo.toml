@@ -8,9 +8,13 @@ description = "SMS Code Bridge - Windows 端：接收局域网验证码并写入
 embed-resource = "2"
 
 [dependencies]
+# 协议 v2：验证码消息 AES-256-GCM 加密（纯 Rust 实现，无 OpenSSL 依赖）
+aes-gcm = "0.10"
 clipboard-win = "5"
 dirs = "5"
 hmac = "0.12"
+# 协议 v2：配对证明 PBKDF2-HMAC-SHA256（纯 Rust 实现）
+pbkdf2 = { version = "0.12", features = ["hmac"] }
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

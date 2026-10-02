@@ -3,6 +3,7 @@ package com.parado.smsbridge
 import com.parado.smsbridge.net.UdpSender
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.net.DatagramPacket
@@ -38,6 +39,54 @@ class UdpSenderTest {
         assertFalse(UdpSender.send("127.0.0.1", 70000, bytes))
         assertFalse(UdpSender.send("127.0.0.1", 12345, ByteArray(0)))
         assertFalse(UdpSender.send("127.0.0.1", 12345, ByteArray(UdpSender.MAX_FRAME_BYTES + 1)))
+    }
+
+    @Test
+    fun send_and_wait_receives_response_over_loopback() {
+        DatagramSocket(0).use { responder ->
+            responder.soTimeout = 2_000
+            val port = responder.localPort
+            Thread {
+                val buffer = ByteArray(256)
+                val request = DatagramPacket(buffer, buffer.size)
+                responder.receive(request)
+                val reply = "pair-ok".toByteArray()
+                responder.send(
+                    DatagramPacket(reply, reply.size, request.address, request.port),
+                )
+            }.start()
+
+            val response = UdpSender.sendAndWait(
+                "127.0.0.1",
+                port,
+                "{\"type\":\"pair_request\"}".toByteArray(),
+                2_000,
+            )
+            assertArrayEquals("pair-ok".toByteArray(), response)
+        }
+    }
+
+    @Test
+    fun send_and_wait_returns_null_on_timeout() {
+        // 向未监听的高位端口发送，超时后应返回 null 而不是抛异常
+        val response = UdpSender.sendAndWait("127.0.0.1", 1, "probe".toByteArray(), 300)
+        assertNull(response)
+    }
+
+    @Test
+    fun send_and_wait_rejects_invalid_arguments() {
+        val bytes = "x".toByteArray()
+        assertNull(UdpSender.sendAndWait("127.0.0.1", 0, bytes, 1_000))
+        assertNull(UdpSender.sendAndWait("127.0.0.1", 70000, bytes, 1_000))
+        assertNull(UdpSender.sendAndWait("127.0.0.1", 12345, ByteArray(0), 1_000))
+        assertNull(
+            UdpSender.sendAndWait(
+                "127.0.0.1",
+                12345,
+                ByteArray(UdpSender.MAX_FRAME_BYTES + 1),
+                1_000,
+            ),
+        )
     }
 
     @Test

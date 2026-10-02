@@ -1,37 +1,43 @@
-//! 两端共享的局域网消息协议。
+//! 两端共享的局域网消息协议（v2）。
 //!
-//! 安全约束：消息体只携带必要字段，**绝不包含短信原文、手机号或发件人**。
+//! 安全约束：
+//! - 消息体只携带必要字段，**绝不包含短信原文、手机号或发件人**
+//! - 配对码不上网：PairRequest 只带盐值与 PBKDF2 证明（见 `pairing.rs`）
+//! - 验证码内容加密：Code 只带 AES-256-GCM 密文，密钥由配对派生、从不上网
+//!
 //! 夹具见 `shared/testdata/`，与 Android 端共用，保证两端解析行为一致。
 
 use serde::{Deserialize, Serialize};
 
 /// 协议版本。版本不一致的消息一律拒绝处理。
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Message {
-    /// 手机 → 电脑：携带配对码的配对请求
+    /// 手机 → 电脑：配对请求（不带配对码，只带盐值与知识证明）
     PairRequest {
         v: u32,
         device_id: String,
-        code: String,
-        /// 手机生成的随机盐（hex）。两端各自用 code + salt 派生同一会话密钥，密钥本身不上网传输。
+        /// 手机生成的随机盐（hex，16 字节），仅本次配对使用。
         salt_hex: String,
+        /// PBKDF2-HMAC-SHA256(配对码, 盐) 的十六进制证明；配对码本身绝不上网传输。
+        proof_hex: String,
     },
-    /// 电脑 → 手机：配对结果
+    /// 电脑 → 手机：配对结果（session_id 可用于验证对端确已派生同一密钥）
     PairResponse {
         v: u32,
         ok: bool,
         session_id: Option<String>,
     },
-    /// 手机 → 电脑：验证码（只含验证码本身）
+    /// 手机 → 电脑：验证码（密文，只含验证码本身）
     Code {
         v: u32,
-        code: String,
         ts: i64,
-        nonce: String,
-        mac: String,
+        /// AES-256-GCM 随机 IV（hex，12 字节），同时用作重放检测的键。
+        iv_hex: String,
+        /// 密文（含 16 字节认证标签，hex）；AAD 为 "code|{ts}"，明文仅含验证码数字。
+        ct_hex: String,
     },
     /// 手机 → 电脑：心跳保活（仅含版本与设备号，绝不携带敏感信息）
     Heartbeat { v: u32, device_id: String },
@@ -44,8 +50,14 @@ pub enum Message {
         name: String,
         port: u16,
     },
-    /// 手机 → 电脑：主动解绑（清密钥 + 清配对）
-    Unpair { v: u32, device_id: String },
+    /// 手机 → 电脑：主动解绑（需会话密钥认证，防伪造）
+    Unpair {
+        v: u32,
+        device_id: String,
+        ts: i64,
+        /// HMAC-SHA256(会话密钥, "unpair|{ts}")，十六进制。
+        mac_hex: String,
+    },
 }
 
 impl Message {
@@ -85,11 +97,17 @@ mod tests {
         let message = Message::from_json(raw).expect("解析配对请求失败");
         match &message {
             Message::PairRequest {
-                code, device_id, salt_hex, ..
+                device_id,
+                salt_hex,
+                proof_hex,
+                ..
             } => {
-                assert_eq!(code, "123456");
                 assert_eq!(device_id, "device-0001");
                 assert_eq!(salt_hex, "30313233343536373839616263646566");
+                assert_eq!(
+                    proof_hex,
+                    "887fc04592766b594b2abe0b9ade1a53da0560339eb3c7d2903f38dd2000116e"
+                );
             }
             other => panic!("消息类型不符: {other:?}"),
         }
@@ -105,7 +123,7 @@ mod tests {
         match &message {
             Message::PairResponse { ok, session_id, .. } => {
                 assert!(ok);
-                assert_eq!(session_id.as_deref(), Some("s-0001"));
+                assert_eq!(session_id.as_deref(), Some("0f5ae74e37fae0e8"));
             }
             other => panic!("消息类型不符: {other:?}"),
         }
@@ -117,11 +135,11 @@ mod tests {
         let message = Message::from_json(raw).expect("解析验证码消息失败");
         match &message {
             Message::Code {
-                code, ts, nonce, ..
+                ts, iv_hex, ct_hex, ..
             } => {
-                assert_eq!(code, "482913");
                 assert_eq!(*ts, 1_757_337_600_000);
-                assert_eq!(nonce, "n-0001");
+                assert_eq!(iv_hex, "000102030405060708090a0b");
+                assert_eq!(ct_hex, "733ae422f4d65d9adc9f1e88ba1812b0a0ebc425b984");
             }
             other => panic!("消息类型不符: {other:?}"),
         }
@@ -183,7 +201,9 @@ mod tests {
         let raw = include_str!("../../shared/testdata/code_message.json");
         let message = Message::from_json(raw).expect("解析失败");
         let encoded = message.to_json().expect("序列化失败");
-        for forbidden in ["body", "sender", "phone", "address", "content"] {
+        // 密文形态的消息里不应再出现明文验证码字段或短信相关字段
+        // （"code" 是消息类型名，无法用子串排除，结构由 roundtrip 测试锁定）
+        for forbidden in ["body", "sender", "phone", "address", "content", "\"nonce\""] {
             assert!(
                 !encoded.contains(forbidden),
                 "消息体不应出现字段 {forbidden}: {encoded}"
@@ -212,9 +232,19 @@ mod tests {
         let raw = include_str!("../../shared/testdata/unpair.json");
         let message = Message::from_json(raw).expect("解析解绑消息失败");
         match &message {
-            Message::Unpair { v, device_id } => {
+            Message::Unpair {
+                v,
+                device_id,
+                ts,
+                mac_hex,
+            } => {
                 assert_eq!(*v, PROTOCOL_VERSION);
                 assert_eq!(device_id, "device-0001");
+                assert_eq!(*ts, 1_757_337_600_000);
+                assert_eq!(
+                    mac_hex,
+                    "86279a29238265aa8ee995e3909b0ab5773cb3df5d84f1c666605d0483eb19c6"
+                );
             }
             other => panic!("消息类型不符: {other:?}"),
         }
@@ -223,12 +253,8 @@ mod tests {
     }
 
     #[test]
-    fn heartbeat_and_unpair_never_carry_sensitive_fields() {
+    fn heartbeat_and_discovery_never_carry_sensitive_fields() {
         let heartbeat = Message::Heartbeat {
-            v: PROTOCOL_VERSION,
-            device_id: "device-0001".into(),
-        };
-        let unpair = Message::Unpair {
             v: PROTOCOL_VERSION,
             device_id: "device-0001".into(),
         };
@@ -244,7 +270,6 @@ mod tests {
         };
         for (name, message) in [
             ("heartbeat", heartbeat),
-            ("unpair", unpair),
             ("discovery_request", request),
             ("discovery_response", response),
         ] {

@@ -3,14 +3,15 @@ package com.parado.smsbridge.protocol
 import org.json.JSONObject
 
 /**
- * 两端共享的局域网消息协议，须与 computer/src/protocol.rs 保持一致。
+ * 两端共享的局域网消息协议（v2），须与 computer/src/protocol.rs 保持一致。
  *
- * 安全约束：消息体只携带必要字段，**绝不包含短信原文、手机号或发件人**。
+ * 安全约束：消息体只携带必要字段，**绝不包含短信原文、手机号或发件人**；
+ * 配对码不上网（只传盐值与 PBKDF2 证明），验证码内容以 AES-256-GCM 密文传输。
  * 使用 Android 内置的 org.json，不引入任何外部依赖。
  */
 object Protocol {
 
-    const val VERSION = 1
+    const val VERSION = 2
 
     const val TYPE_PAIR_REQUEST = "pair_request"
     const val TYPE_PAIR_RESPONSE = "pair_response"
@@ -23,27 +24,31 @@ object Protocol {
     sealed class Message {
         abstract val v: Int
 
-        /** 手机 → 电脑：携带配对码的配对请求 */
+        /** 手机 → 电脑：配对请求（不带配对码，只带盐值与知识证明） */
         data class PairRequest(
             override val v: Int,
             val deviceId: String,
-            val code: String,
+            /** 手机生成的随机盐（hex，16 字节），仅本次配对使用。 */
+            val saltHex: String,
+            /** PBKDF2-HMAC-SHA256(配对码, 盐) 的证明；配对码本身绝不上网传输。 */
+            val proofHex: String,
         ) : Message()
 
-        /** 电脑 → 手机：配对结果 */
+        /** 电脑 → 手机：配对结果（sessionId 可用于验证对端确已派生同一密钥） */
         data class PairResponse(
             override val v: Int,
             val ok: Boolean,
             val sessionId: String?,
         ) : Message()
 
-        /** 手机 → 电脑：验证码（只含验证码本身） */
+        /** 手机 → 电脑：验证码（密文，只含验证码本身） */
         data class Code(
             override val v: Int,
-            val code: String,
             val ts: Long,
-            val nonce: String,
-            val mac: String,
+            /** AES-256-GCM 随机 IV（hex，12 字节），同时用作重放检测的键。 */
+            val ivHex: String,
+            /** 密文（含认证标签，hex）；AAD 为 "code|{ts}"，明文仅含验证码数字。 */
+            val ctHex: String,
         ) : Message()
 
         /** 手机 → 电脑：心跳保活（仅含版本与设备号） */
@@ -66,10 +71,13 @@ object Protocol {
             val port: Int,
         ) : Message()
 
-        /** 手机 → 电脑：主动解绑（清密钥 + 清配对） */
+        /** 手机 → 电脑：主动解绑（需会话密钥认证，防伪造） */
         data class Unpair(
             override val v: Int,
             val deviceId: String,
+            val ts: Long,
+            /** HMAC-SHA256(会话密钥, "unpair|{ts}")，十六进制。 */
+            val macHex: String,
         ) : Message()
     }
 
@@ -82,7 +90,8 @@ object Protocol {
                 put("type", TYPE_PAIR_REQUEST)
                 put("v", message.v)
                 put("device_id", message.deviceId)
-                put("code", message.code)
+                put("salt_hex", message.saltHex)
+                put("proof_hex", message.proofHex)
             }
 
             is Message.PairResponse -> {
@@ -99,10 +108,9 @@ object Protocol {
             is Message.Code -> {
                 put("type", TYPE_CODE)
                 put("v", message.v)
-                put("code", message.code)
                 put("ts", message.ts)
-                put("nonce", message.nonce)
-                put("mac", message.mac)
+                put("iv_hex", message.ivHex)
+                put("ct_hex", message.ctHex)
             }
 
             is Message.Heartbeat -> {
@@ -129,6 +137,8 @@ object Protocol {
                 put("type", TYPE_UNPAIR)
                 put("v", message.v)
                 put("device_id", message.deviceId)
+                put("ts", message.ts)
+                put("mac_hex", message.macHex)
             }
         }
     }.toString()
@@ -141,7 +151,8 @@ object Protocol {
             TYPE_PAIR_REQUEST -> Message.PairRequest(
                 v,
                 json.getString("device_id"),
-                json.getString("code"),
+                json.getString("salt_hex"),
+                json.getString("proof_hex"),
             )
 
             TYPE_PAIR_RESPONSE -> Message.PairResponse(
@@ -152,10 +163,9 @@ object Protocol {
 
             TYPE_CODE -> Message.Code(
                 v,
-                json.getString("code"),
                 json.getLong("ts"),
-                json.getString("nonce"),
-                json.getString("mac"),
+                json.getString("iv_hex"),
+                json.getString("ct_hex"),
             )
 
             TYPE_HEARTBEAT -> Message.Heartbeat(
@@ -178,6 +188,8 @@ object Protocol {
             TYPE_UNPAIR -> Message.Unpair(
                 v,
                 json.getString("device_id"),
+                json.getLong("ts"),
+                json.getString("mac_hex"),
             )
 
             else -> null

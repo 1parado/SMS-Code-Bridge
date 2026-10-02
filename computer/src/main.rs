@@ -4,7 +4,7 @@ use sms_code_bridge::connection::{Heartbeat, SessionRegistry, HEARTBEAT_TIMEOUT_
 use sms_code_bridge::devices::{DeviceStore, PairedDevice};
 use sms_code_bridge::discovery::DISCOVERY_PORT;
 use sms_code_bridge::history::HistoryStore;
-use sms_code_bridge::pairing::{now_ms, PairingManager, DEFAULT_TTL_MS};
+use sms_code_bridge::pairing::{hex_decode, now_ms, to_hex, PairingManager, DEFAULT_TTL_MS};
 use sms_code_bridge::protocol::{Message, PROTOCOL_VERSION};
 use sms_code_bridge::transport::{UdpTransport, MAX_FRAME_BYTES};
 #[cfg(windows)]
@@ -120,39 +120,55 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
         match message {
             Message::PairRequest {
-                code, device_id, salt_hex, ..
-            } => match pairing.verify(&code, &hex_decode(&salt_hex).unwrap_or_default(), now_ms()) {
-                Some(established) => {
-                    registry.establish(device_id.clone(), established.secret);
-                    heartbeat.mark(now_ms());
-                    // 持久化已配对设备（密钥仅存本机，绝不上网传输）
-                    devices.add(PairedDevice {
-                        id: device_id.clone(),
-                        name: device_id.clone(),
-                        secret_hex: to_hex(&established.secret),
-                        paired_at_ms: now_ms(),
-                    });
-                    let _ = devices.save();
-                    let response = Message::PairResponse {
-                        v: PROTOCOL_VERSION,
-                        ok: true,
-                        session_id: Some(established.session_id),
-                    };
-                    if let Ok(json) = response.to_json() {
-                        let _ = transport.send_to(json.as_bytes(), from);
+                device_id,
+                salt_hex,
+                proof_hex,
+                ..
+            } => {
+                // 盐值非法或证明校验不过（错码/过期/超次）都直接拒绝
+                let outcome = hex_decode(&salt_hex)
+                    .and_then(|salt| pairing.verify(&proof_hex, &salt, now_ms()));
+                match outcome {
+                    Some(established) => {
+                        registry.establish(device_id.clone(), established.secret);
+                        heartbeat.mark(now_ms());
+                        // 持久化已配对设备（密钥仅存本机，绝不上网传输）
+                        devices.add(PairedDevice {
+                            id: device_id.clone(),
+                            name: device_id.clone(),
+                            secret_hex: to_hex(&established.secret),
+                            paired_at_ms: now_ms(),
+                        });
+                        let _ = devices.save();
+                        let response = Message::PairResponse {
+                            v: PROTOCOL_VERSION,
+                            ok: true,
+                            session_id: Some(established.session_id),
+                        };
+                        if let Ok(json) = response.to_json() {
+                            let _ = transport.send_to(json.as_bytes(), from);
+                        }
+                        println!("设备 {device_id} 已配对：{from}");
                     }
-                    println!("设备 {device_id} 已配对：{from}");
+                    None => println!("拒绝来自 {from} 的配对请求"),
                 }
-                None => println!("拒绝来自 {from} 的配对请求"),
-            },
+            }
             Message::Heartbeat { device_id, .. } => {
                 // 仅当设备号匹配当前绑定设备时才打点，避免陌生设备续命
                 if registry.is_bound() && registry.bound_device_id() == Some(device_id.as_str()) {
                     heartbeat.mark(now_ms());
                 }
             }
-            Message::Unpair { device_id, .. } => {
-                if registry.bound_device_id() == Some(device_id.as_str()) {
+            Message::Unpair {
+                device_id,
+                ts,
+                mac_hex,
+                ..
+            } => {
+                // 解绑必须携带会话密钥认证，防止局域网内伪造
+                if registry.bound_device_id() == Some(device_id.as_str())
+                    && registry.verify_unpair(ts, &mac_hex, now_ms())
+                {
                     registry.unbind();
                     heartbeat = Heartbeat::new(HEARTBEAT_TIMEOUT_MS);
                     devices.clear();
@@ -190,25 +206,4 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // 托盘「退出」走 break 到这里，正常结束
     Ok(())
-}
-
-/// 字节切片转小写十六进制（用于持久化密钥）。
-fn to_hex(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        out.push_str(&format!("{b:02x}"));
-    }
-    out
-}
-
-/// 十六进制转字节；长度非偶数或含非法字符时返回 None。
-fn hex_decode(text: &str) -> Option<Vec<u8>> {
-    if !text.len().is_multiple_of(2) {
-        return None;
-    }
-    (0..text.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&text[i..i + 2], 16))
-        .collect::<Result<Vec<u8>, _>>()
-        .ok()
 }

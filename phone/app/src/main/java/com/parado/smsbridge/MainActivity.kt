@@ -21,6 +21,7 @@ import com.parado.smsbridge.net.Discovery
 import com.parado.smsbridge.net.DiscoveryClient
 import com.parado.smsbridge.net.UdpSender
 import com.parado.smsbridge.pairing.PairingClient
+import com.parado.smsbridge.protocol.Crypto
 import com.parado.smsbridge.protocol.Protocol
 import com.parado.smsbridge.settings.SettingViewModel
 import com.parado.smsbridge.settings.SharedPreferencesSettingRepository
@@ -67,6 +68,9 @@ class MainActivity : Activity() {
     /** 心跳发送间隔与超时（毫秒）。 */
     private val heartbeatIntervalMs = 5_000L
     private val heartbeatTimeoutMs = 15_000L
+
+    /** 配对响应等待时长（毫秒）。 */
+    private val pairResponseTimeoutMs = 3_000
 
     private val heartbeatHandler = Handler(Looper.getMainLooper())
     private val heartbeatRunnable = Runnable { sendHeartbeat() }
@@ -120,9 +124,10 @@ class MainActivity : Activity() {
         }
 
         unbindButton.setOnClickListener {
+            // 先用会话密钥计算解绑认证，再清理本地状态
+            stateMachine.session?.let { session -> sendUnpair(session.secretHex) }
             stateMachine.unbind()
             stopHeartbeat()
-            sendUnpair()
             monitor = ConnectionMonitor(heartbeatTimeoutMs, 1_000, 2, 30_000)
             refresh()
         }
@@ -200,40 +205,69 @@ class MainActivity : Activity() {
         return Discovery.broadcastAddress(local, "255.255.255.0")
     }
 
+    /**
+     * 发起配对：生成盐值与证明（配对码不上网）发送 PairRequest，
+     * 等待 PairResponse 并用会话 ID 验证电脑端确已派生同一密钥。
+     * 网络操作全部在后台线程，避免主线程网络异常。
+     */
     private fun sendPairRequest(code: String) {
-        stateMachine.start()
-        val payload = Protocol.toJson(
-            Protocol.Message.PairRequest(Protocol.VERSION, deviceId, code),
-        )
-        val ok = UdpSender.sendText(host, port, payload)
-        if (ok) {
-            // v0.1：电脑端响应由后台服务处理，此处先置为配对中并本地建立会话
-            stateMachine.succeed(PairingClient.deriveSecretHex(code, ByteArray(0)))
-            statusText.text = "已配对（在线）"
-            startHeartbeat()
-        } else {
-            stateMachine.fail()
-            show("发送失败，请检查地址与网络")
-        }
-        refresh()
+        if (!stateMachine.start()) return
+        show("配对中…")
+        Thread {
+            val saltHex = PairingClient.createSaltHex()
+            val salt = Crypto.hexToBytes(saltHex) ?: ByteArray(0)
+            val proofHex = PairingClient.deriveProofHex(code, salt)
+            val request = Protocol.toJson(
+                Protocol.Message.PairRequest(Protocol.VERSION, deviceId, saltHex, proofHex),
+            )
+            val response = UdpSender
+                .sendAndWait(host, port, request.toByteArray(Charsets.UTF_8), pairResponseTimeoutMs)
+                ?.let { bytes -> Protocol.parse(String(bytes, Charsets.UTF_8)) }
+                as? Protocol.Message.PairResponse
+            val secretHex = PairingClient.deriveSecretHex(proofHex)
+            val paired = response != null &&
+                response.ok &&
+                PairingClient.validatePairResponse(response.sessionId, secretHex)
+            runOnUiThread {
+                if (paired) {
+                    stateMachine.succeed(secretHex)
+                    statusText.text = "已配对（在线）"
+                    startHeartbeat()
+                } else {
+                    stateMachine.fail()
+                    show(
+                        if (response == null) {
+                            "配对超时：请确认电脑端配对码未过期"
+                        } else {
+                            "配对失败：请检查配对码"
+                        },
+                    )
+                }
+                refresh()
+            }
+        }.start()
     }
 
-    /** 周期性向电脑端发送心跳；失败则进入指数退避重连。 */
+    /** 周期性向电脑端发送心跳；失败则进入指数退避重连。网络操作在后台线程。 */
     private fun sendHeartbeat() {
         if (stateMachine.session == null) {
             stopHeartbeat()
             return
         }
         val payload = Protocol.toJson(Protocol.Message.Heartbeat(Protocol.VERSION, deviceId))
-        val ok = UdpSender.sendText(host, port, payload)
-        val delay = if (ok) {
-            monitor.onHeartbeat(System.currentTimeMillis())
-            heartbeatIntervalMs
-        } else {
-            statusText.text = "已配对（重连中…）"
-            monitor.nextReconnectDelayMs()
-        }
-        heartbeatHandler.postDelayed(heartbeatRunnable, delay)
+        Thread {
+            val ok = UdpSender.sendText(host, port, payload)
+            runOnUiThread {
+                val delay = if (ok) {
+                    monitor.onHeartbeat(System.currentTimeMillis())
+                    heartbeatIntervalMs
+                } else {
+                    statusText.text = "已配对（重连中…）"
+                    monitor.nextReconnectDelayMs()
+                }
+                heartbeatHandler.postDelayed(heartbeatRunnable, delay)
+            }
+        }.start()
     }
 
     private fun startHeartbeat() {
@@ -245,23 +279,33 @@ class MainActivity : Activity() {
         heartbeatHandler.removeCallbacks(heartbeatRunnable)
     }
 
-    /** 解绑时通知电脑端清除密钥与配对（尽力发送，失败不影响本地解绑）。 */
-    private fun sendUnpair() {
+    /** 解绑时通知电脑端清除密钥与配对（需会话密钥认证；尽力发送，失败不影响本地解绑）。 */
+    private fun sendUnpair(secretHex: String) {
         if (host.isEmpty() || port <= 0) return
-        val payload = Protocol.toJson(Protocol.Message.Unpair(Protocol.VERSION, deviceId))
-        UdpSender.sendText(host, port, payload)
+        val ts = System.currentTimeMillis()
+        val payload = Protocol.toJson(
+            Protocol.Message.Unpair(Protocol.VERSION, deviceId, ts, PairingClient.unpairMacHex(secretHex, ts)),
+        )
+        Thread { UdpSender.sendText(host, port, payload) }.start()
     }
 
+    /** 加密发送验证码：AES-256-GCM（密钥为配对派生的会话密钥），网络操作在后台线程。 */
     private fun sendCode(code: String) {
         val session = stateMachine.session ?: return
-        val message = Protocol.Message.Code(
-            Protocol.VERSION,
-            code,
-            System.currentTimeMillis(),
-            System.nanoTime().toString(),
-            session.secretHex,
-        )
-        UdpSender.sendText(host, port, Protocol.toJson(message))
+        val secret = Crypto.hexToBytes(session.secretHex) ?: return
+        Thread {
+            val ts = System.currentTimeMillis()
+            val iv = Crypto.randomBytes(Crypto.IV_LEN)
+            val aad = "code|$ts".toByteArray(Charsets.UTF_8)
+            val ciphertext = Crypto.aesGcmSeal(secret, iv, aad, code.toByteArray(Charsets.UTF_8))
+            val message = Protocol.Message.Code(
+                Protocol.VERSION,
+                ts,
+                Crypto.toHex(iv),
+                Crypto.toHex(ciphertext),
+            )
+            UdpSender.sendText(host, port, Protocol.toJson(message))
+        }.start()
     }
 
     private fun requestSmsPermission() {

@@ -114,10 +114,17 @@ impl SessionRegistry {
         self.device_id.as_deref()
     }
 
-    /// 处理验证码消息；未绑定或 MAC 校验失败返回 None（即拒绝）。
+    /// 处理验证码消息；未绑定或认证解密失败返回 None（即拒绝）。
     pub fn handle(&mut self, buf: &[u8], now: i64) -> Option<String> {
         let receiver = self.receiver.as_mut()?;
         receiver.handle(buf, now).ok()
+    }
+
+    /// 校验解绑请求的认证 MAC；未绑定时一律 false。
+    pub fn verify_unpair(&self, ts: i64, mac_hex: &str, now: i64) -> bool {
+        self.receiver
+            .as_ref()
+            .is_some_and(|receiver| receiver.verify_unpair(ts, mac_hex, now))
     }
 }
 
@@ -173,10 +180,9 @@ mod tests {
         let mut reg = SessionRegistry::new();
         let message = Message::Code {
             v: PROTOCOL_VERSION,
-            code: "482913".to_string(),
             ts: 1,
-            nonce: "n-0001".to_string(),
-            mac: "deadbeef".to_string(),
+            iv_hex: "000102030405060708090a0b".to_string(),
+            ct_hex: "00".to_string(),
         };
         let json = message.to_json().expect("序列化失败");
 
@@ -187,6 +193,28 @@ mod tests {
         reg.establish("device-0001".to_string(), [7u8; 32]);
         reg.unbind();
         assert!(reg.handle(json.as_bytes(), 1).is_none());
+    }
+
+    #[test]
+    fn unpair_requires_authentication() {
+        let mut reg = SessionRegistry::new();
+        // 未绑定：一律拒绝
+        assert!(!reg.verify_unpair(1_000, "aabb", 1_000));
+        reg.establish("device-0001".to_string(), [7u8; 32]);
+        // MAC 错误：拒绝
+        assert!(!reg.verify_unpair(1_000, "aabb", 1_000));
+        // 时间戳出窗：拒绝
+        let valid = crate::pairing::to_hex(&{
+            use hmac::{Hmac, Mac};
+            use sha2::Sha256;
+            let mut mac =
+                <Hmac<Sha256> as Mac>::new_from_slice(&[7u8; 32]).expect("HMAC 接受任意长度密钥");
+            mac.update(b"unpair|1000");
+            mac.finalize().into_bytes()
+        });
+        assert!(!reg.verify_unpair(1_000, &valid, 1_000 + 300_001));
+        // 正确 MAC 且在窗口内：通过
+        assert!(reg.verify_unpair(1_000, &valid, 1_000));
     }
 
     #[test]

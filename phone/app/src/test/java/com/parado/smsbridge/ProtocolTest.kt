@@ -27,8 +27,12 @@ class ProtocolTest {
         val message = Protocol.parse(fixture("pair_request.json"))
         assertNotNull(message)
         message as Protocol.Message.PairRequest
-        assertEquals("123456", message.code)
         assertEquals("device-0001", message.deviceId)
+        assertEquals("30313233343536373839616263646566", message.saltHex)
+        assertEquals(
+            "887fc04592766b594b2abe0b9ade1a53da0560339eb3c7d2903f38dd2000116e",
+            message.proofHex,
+        )
         assertTrue(Protocol.isSupported(message))
 
         val reparsed = Protocol.parse(Protocol.toJson(message))
@@ -41,7 +45,7 @@ class ProtocolTest {
         assertNotNull(message)
         message as Protocol.Message.PairResponse
         assertTrue(message.ok)
-        assertEquals("s-0001", message.sessionId)
+        assertEquals("0f5ae74e37fae0e8", message.sessionId)
 
         val reparsed = Protocol.parse(Protocol.toJson(message))
         assertEquals(message, reparsed)
@@ -52,9 +56,9 @@ class ProtocolTest {
         val message = Protocol.parse(fixture("code_message.json"))
         assertNotNull(message)
         message as Protocol.Message.Code
-        assertEquals("482913", message.code)
         assertEquals(1_757_337_600_000L, message.ts)
-        assertEquals("n-0001", message.nonce)
+        assertEquals("000102030405060708090a0b", message.ivHex)
+        assertEquals("733ae422f4d65d9adc9f1e88ba1812b0a0ebc425b984", message.ctHex)
 
         val reparsed = Protocol.parse(Protocol.toJson(message))
         assertEquals(message, reparsed)
@@ -76,7 +80,7 @@ class ProtocolTest {
 
     @Test
     fun unknownTypeReturnsNull() {
-        assertNull(Protocol.parse("{\"type\":\"whatever\",\"v\":1}"))
+        assertNull(Protocol.parse("{\"type\":\"whatever\",\"v\":2}"))
     }
 
     @Test
@@ -89,7 +93,8 @@ class ProtocolTest {
     fun codeMessageNeverCarriesSensitiveFields() {
         val message = Protocol.parse(fixture("code_message.json")) as Protocol.Message.Code
         val json = Protocol.toJson(message)
-        listOf("body", "sender", "phone", "address", "content").forEach { forbidden ->
+        // 密文形态的消息不应出现明文验证码字段或短信相关字段
+        listOf("body", "sender", "phone", "address", "content", "\"nonce\"").forEach { forbidden ->
             assertFalse("消息体不应出现字段 $forbidden: $json", json.contains(forbidden))
         }
     }
@@ -113,18 +118,25 @@ class ProtocolTest {
         message as Protocol.Message.Unpair
         assertEquals(Protocol.VERSION, message.v)
         assertEquals("device-0001", message.deviceId)
+        assertEquals(1_757_337_600_000L, message.ts)
+        assertEquals(
+            "86279a29238265aa8ee995e3909b0ab5773cb3df5d84f1c666605d0483eb19c6",
+            message.macHex,
+        )
 
         val reparsed = Protocol.parse(Protocol.toJson(message))
         assertEquals(message, reparsed)
     }
 
     @Test
-    fun heartbeatAndUnpairNeverCarrySensitiveFields() {
+    fun heartbeatAndDiscoveryNeverCarrySensitiveFields() {
         val heartbeat = Protocol.toJson(Protocol.Message.Heartbeat(Protocol.VERSION, "device-0001"))
-        val unpair = Protocol.toJson(Protocol.Message.Unpair(Protocol.VERSION, "device-0001"))
+        val discovery = Protocol.toJson(
+            Protocol.Message.DiscoveryResponse(Protocol.VERSION, "pc-0001", "PC-0001", 45876),
+        )
         listOf("body", "sender", "phone", "address", "content", "secret", "code").forEach { forbidden ->
             assertFalse("heartbeat 不应出现字段 $forbidden: $heartbeat", heartbeat.contains(forbidden))
-            assertFalse("unpair 不应出现字段 $forbidden: $unpair", unpair.contains(forbidden))
+            assertFalse("discovery 不应出现字段 $forbidden: $discovery", discovery.contains(forbidden))
         }
     }
 }
